@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { callJsonChatWithOptionalReview } from "@/lib/ai-question-pipeline";
 import { getFilteredPastQuestions } from "@/lib/exams";
-import { callJsonChat } from "@/lib/openai";
 import { buildGeneratePrompt } from "@/lib/prompts";
 import {
   aiResponseSchema,
@@ -53,9 +53,9 @@ export async function POST(req: Request) {
 
   let raw: unknown;
   try {
-    raw = await callJsonChat({ system, user });
+    raw = await callJsonChatWithOptionalReview({ system, user });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "OpenAI call failed";
+    const message = e instanceof Error ? e.message : "AI generation failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 

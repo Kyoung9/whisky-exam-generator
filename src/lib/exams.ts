@@ -19,6 +19,72 @@ function isPlaceholder(q: PastExamQuestion): boolean {
   return PLACEHOLDER_BODY_RE.test(q.body ?? "");
 }
 
+// Fisher–Yates（非決定的）。試験問題プールの多様なサンプリング用。
+function shuffleInPlace<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = arr[i]!;
+    arr[i] = arr[j]!;
+    arr[j] = t;
+  }
+}
+
+/**
+ * カテゴリ×タイプごとに均等に近づけつつ limit 件を選ぶ（先頭スライスよりバランスが良い）。
+ */
+export function stratifiedSamplePastQuestions(
+  questions: PastExamQuestion[],
+  limit: number
+): PastExamQuestion[] {
+  if (limit <= 0) return [];
+  if (questions.length <= limit) {
+    const copy = [...questions];
+    shuffleInPlace(copy);
+    return copy;
+  }
+
+  const buckets = new Map<string, PastExamQuestion[]>();
+  for (const q of questions) {
+    const key = `${q.category}::${q.type}`;
+    const arr = buckets.get(key) ?? [];
+    arr.push(q);
+    buckets.set(key, arr);
+  }
+  for (const arr of buckets.values()) {
+    shuffleInPlace(arr);
+  }
+  const keys = [...buckets.keys()];
+  shuffleInPlace(keys);
+
+  const out: PastExamQuestion[] = [];
+  let round = 0;
+  for (;;) {
+    let addedThisRound = false;
+    for (const key of keys) {
+      if (out.length >= limit) return out;
+      const bucket = buckets.get(key)!;
+      if (round < bucket.length) {
+        out.push(bucket[round]!);
+        addedThisRound = true;
+      }
+    }
+    if (!addedThisRound) break;
+    round++;
+  }
+
+  if (out.length < limit) {
+    const used = new Set(out.map((q) => q.id));
+    const rest = questions.filter((q) => !used.has(q.id));
+    shuffleInPlace(rest);
+    for (const q of rest) {
+      if (out.length >= limit) break;
+      out.push(q);
+    }
+  }
+
+  return out;
+}
+
 // 静的 JSON を PastExamQuestion[] にキャストする
 function asPastExamQuestions(raw: unknown): PastExamQuestion[] {
   if (!Array.isArray(raw)) return [];
@@ -31,6 +97,7 @@ export function getQuestionsByYear(year: ExamYear): PastExamQuestion[] {
 
 // 指定された年の問題を全て集めて、カテゴリ/種別で絞り込む。
 // OCR 未抽出のプレースホルダー entry は AI に参照させないため除外する。
+// limit 指定時は層化サンプリングで多様なセットを返す。
 export function getFilteredPastQuestions(input: {
   years: ExamYear[];
   categories?: Category[];
@@ -49,7 +116,7 @@ export function getFilteredPastQuestions(input: {
     return true;
   });
   if (input.limit && filtered.length > input.limit) {
-    return filtered.slice(0, input.limit);
+    return stratifiedSamplePastQuestions(filtered, input.limit);
   }
   return filtered;
 }

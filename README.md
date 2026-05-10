@@ -685,8 +685,9 @@ public/
 
 ```bash
 cp .env.local.example .env.local
-# .env.local 을 편집하여 OPENAI_API_KEY 를 설정한다
-# 모델은 기본값 gpt-5-mini. 변경하려면 OPENAI_MODEL 도 설정한다
+# .env.local 에서 OPENAI_API_KEY 와/또는 GEMINI_API_KEY 를 설정한다
+# 문제 생성 API 는 OpenAI 를 우선 사용하고, 실패하거나 키가 없으면 Gemini 로 폴백한다
+# 텍스트 모델: 기본 gpt-5-mini (OPENAI_MODEL), Gemini 는 기본 gemini-2.0-flash (GEMINI_MODEL)
 ```
 
 ## 13.2 의존성 설치 & 실행
@@ -775,7 +776,7 @@ PDF 는 브라우저에서 `@react-pdf/renderer` 로 생성되며, 일본어 표
 
 ```bash
 vercel
-# 환경변수 OPENAI_API_KEY (와 필요 시 OPENAI_MODEL) 를 Vercel プロジェクト 측에서 설정한다
+# 환경변수 OPENAI_API_KEY / GEMINI_API_KEY (와 필요 시 OPENAI_MODEL, GEMINI_MODEL) 를 Vercel 프로젝트 측에서 설정한다
 ```
 
 PDF 생성은 클라이언트, AI 호출만 서버 사이드 (Node ランタイム) 의 API Route 에서 처리한다.

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { callJsonChat } from "@/lib/openai";
+import { callJsonChatWithOptionalReview } from "@/lib/ai-question-pipeline";
 import { buildSimilarPrompt } from "@/lib/prompts";
 import {
   aiResponseSchema,
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { source, count, mode } = parsed.data;
+  const { source, count, mode, includeSourceAnswer } = parsed.data;
   const { system, user } = buildSimilarPrompt({
     source: {
       ...source,
@@ -38,13 +38,14 @@ export async function POST(req: Request) {
     },
     count,
     mode,
+    includeSourceAnswer,
   });
 
   let raw: unknown;
   try {
-    raw = await callJsonChat({ system, user });
+    raw = await callJsonChatWithOptionalReview({ system, user });
   } catch (e) {
-    const message = e instanceof Error ? e.message : "OpenAI call failed";
+    const message = e instanceof Error ? e.message : "AI generation failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
