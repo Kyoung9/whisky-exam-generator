@@ -676,3 +676,106 @@ public/
 
 > 위스キーエキスパート 시험의 과거문제 데이터를 기반으로 AI가 예상문제를 생성하고, 사용자가 문제를 선택·수정·삭제·추가·재정렬한 뒤, 최종 문제집을 PDF로 다운로드할 수 있는 Vercel 배포형 웹 애플리케이션이다.
 > 과거문제 PDF는 리포지토리에 포함하지만, 실제 문제 생성에는 사전에 구조화한 JSON 데이터를 사용한다.
+
+---
+
+# 13. 실행 방법
+
+## 13.1 환경변수 설정
+
+```bash
+cp .env.local.example .env.local
+# .env.local 을 편집하여 OPENAI_API_KEY 를 설정한다
+# 모델은 기본값 gpt-5-mini. 변경하려면 OPENAI_MODEL 도 설정한다
+```
+
+## 13.2 의존성 설치 & 실행
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm run build    # 본번 빌드
+npm run lint     # ESLint
+```
+
+## 13.3 과거문제 데이터 입력
+
+스캔 이미지 PDF (`public/past-exams/{2021..2024}.pdf`) 를 OpenAI Vision 으로 OCR 하여 `src/data/exams/we-{year}.json` 으로 변환하는 일회성 스크립트를 제공한다 (`scripts/build-exam-json.mjs`).
+
+스크립트는 PDF 전체를 슬라이딩 윈도우 (window=3, stride=2 → 1페이지 겹침) 로 훑으면서, **각 페이지가 표지/문제/정답·해설 중 어느 것인지 모델이 자동 판별**해 한 번에 `questions` 와 `answers` 를 동시 추출한다. 마지막에 `(number, subNumber)` 기준으로 정답·해설을 자동 머지한다.
+
+많은 시험집은 **마지막 페이지에 정답 일람표**가 인쇄되어 있다. `--answer-pages F[-T]` 를 지정하면 다음 순서로 동작한다:
+
+1. 지정된 정답 페이지를 **먼저** 전용 프롬프트로 OCR (`answers-FFF-TTT.json` 캐시).
+2. 그 결과에서 sub-question 그룹 (예: `67-a`, `67-b`) 을 자동 도출하여 **sub-map** 을 만든다.
+3. 외부 hint 파일 (`scripts/exam-hints/<year>.json`, 있는 경우) 과 union 으로 합쳐 **effective sub-map** 을 확정.
+4. effective sub-map 을 문제 OCR 의 system prompt 에 주입하여, 각 윈도우에서 sub-question 을 정확히 분리해 추출.
+5. 결과를 머지하고, sub-map 과 비교해 누락·잉여 경고를 출력.
+
+이 흐름 덕분에 답지가 ground truth 가 되며, 사용자가 수동 hint 파일을 유지하지 않아도 정답 페이지만 잘 OCR 되면 자연스럽게 sub-question 이 분리된다.
+
+```bash
+# 단일 연도 전체 (자동 판별 + 자동 머지)
+npm run build:exam-json -- --year 2024
+
+# 정답 일람이 마지막 페이지에 있는 경우 (가장 일반적, 권장)
+npm run build:exam-json -- --year 2024 --answer-pages last
+
+# 페이지 번호를 직접 지정해도 됨
+npm run build:exam-json -- --year 2024 --answer-pages 23
+
+# 정답이 여러 페이지에 걸쳐 있으면 범위 지정
+npm run build:exam-json -- --year 2023 --answer-pages 24-26
+
+# 4 개 모두
+npm run build:exam-json -- --all --answer-pages last
+
+# 특정 페이지만 (디버깅)
+npm run build:exam-json -- --year 2024 --pages 1-7
+
+# API 호출 없이 페이지 렌더링만 확인
+npm run build:exam-json -- --year 2024 --dry-run
+
+# 캐시 무시 재실행
+npm run build:exam-json -- --year 2024 --force
+
+# 윈도우 사이즈/이동량 오버라이드
+npm run build:exam-json -- --year 2024 --window 4 --stride 3
+```
+
+### 내부 동작
+
+- `pdfjs-dist` + `@napi-rs/canvas` 로 PDF 페이지 → PNG 렌더링 (`scale=2`)
+- 페이지 PNG: `.cache/exams/{year}/page-NNN.png`
+- 윈도우별 OpenAI 응답: `.cache/exams/{year}/range-FFF-TTT.json` (`{ version, questions, answers }`)
+- 정답 일람 응답: `.cache/exams/{year}/answers-FFF-TTT.json` (`{ version, answers }`)
+- 캐시 덕분에 재실행 시 미처리 윈도우만 새로 호출
+- 동일 `(number, subNumber)` 가 중복 추출되면 본문(question) / 해설(answer) 이 더 풍부한 쪽을 채택
+- 선택지 prefix(`①`, `1.`, `a.`, `(1)` 등) 는 후처리에서 자동 제거
+- `answer` / `explanation` 은 `(number, subNumber)` 매칭으로 question 객체에 머지. 매칭 실패한 answer 는 콘솔에 경고로 표시
+- sub-map 검증: hint/도출된 sub 와 결과를 비교해 누락·잉여 경고 (`[hint] missing ...`)
+- 외부 hint 파일 (`scripts/exam-hints/<year>.json`) 은 다음 필드를 지원한다:
+  - `totalNumbers: 75` (옵션) — 답지 OCR 이 실패해도 1..N 의 main number 가 결과에 보장된다
+  - `subMap: { "67": ["a","b"], ... }` — sub-question 그룹을 강제 분리
+  - `answerOverrides: { "44": "② または ③", "67-a": "..." }` — OCR 결과를 무시하고 정답을 강제로 덮어쓰는 ground truth 보정. Q44 같이 「② または ③」 식 복수정답 또는 OCR 이 자꾸 틀리는 항목에 사용
+
+### 요건
+
+- `.env.local` 에 `OPENAI_API_KEY` 설정
+- vision 가능 모델 (`OPENAI_VISION_MODEL`, 기본 `gpt-5`)
+- README §7.1 에 따라 오프라인 일회성 처리. 앱 실행 중에는 OCR 하지 않는다.
+
+JSON 이 빈 배열이어도 앱은 동작하지만, AI 는 일반 지식만으로 문제를 생성하므로 시험 경향 반영이 약해진다. AI Vision 결과는 100% 정확하지 않으므로 생성된 JSON 은 반드시 사람이 검수하기를 권장한다 (특히 `category` / `difficulty` 는 모델 추정값).
+
+## 13.4 PDF 출력에 대한 메모
+
+PDF 는 브라우저에서 `@react-pdf/renderer` 로 생성되며, 일본어 표시를 위해 jsDelivr CDN 의 Noto Sans JP TTF 를 동적으로 등록한다. 따라서 PDF 미리보기 / 다운로드 시 인터넷 접속이 필요하다.
+
+## 13.5 Vercel 배포
+
+```bash
+vercel
+# 환경변수 OPENAI_API_KEY (와 필요 시 OPENAI_MODEL) 를 Vercel プロジェクト 측에서 설정한다
+```
+
+PDF 생성은 클라이언트, AI 호출만 서버 사이드 (Node ランタイム) 의 API Route 에서 처리한다.
