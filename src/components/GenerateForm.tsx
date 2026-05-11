@@ -269,9 +269,6 @@ export function GenerateForm({ onGenerated }: Props) {
               }
               setCount(Math.max(0, Math.min(30, Math.floor(v))));
             }}
-            aria-valuemin={0}
-            aria-valuemax={30}
-            aria-valuenow={count}
             className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
           />
           <div className="text-on-surface-variant mt-2 flex justify-between text-[10px] font-[family-name:var(--font-label-caps)]">

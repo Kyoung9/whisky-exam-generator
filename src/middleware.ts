@@ -31,7 +31,12 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // セッション更新はベストエフォート。例外で全ルートを 500 にしない（Vercel の Application error 回避）
+    return response;
+  }
 
   return response;
 }

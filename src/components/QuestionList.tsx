@@ -189,50 +189,53 @@ export function QuestionList({ onGenerateSimilar }: Props) {
           strategy={verticalListSortingStrategy}
         >
           <div className="space-y-4">
-            {questions.map((q, i) => (
-              <SortableItem
-                key={q.id}
-                question={q}
-                index={i}
-                editing={editingId === q.id}
-                onStartEdit={() => setEditingId(q.id)}
-                onCancelEdit={() => setEditingId(null)}
-                onSave={(patch) => {
-                  update(q.id, patch);
-                  setEditingId(null);
-                }}
-                onDelete={() => {
-                  if (confirm("この問題を削除しますか?")) remove(q.id);
-                }}
-                onToggleSelect={() => toggleSelect(q.id)}
-                onMoveUp={i > 0 ? () => move(q.id, "up") : undefined}
-                onMoveDown={
-                  i < questions.length - 1
-                    ? () => move(q.id, "down")
-                    : undefined
-                }
-                onGenerateSimilar={
-                  onGenerateSimilar ? () => onGenerateSimilar(q) : undefined
-                }
-                onShowSource={
-                  q.sourceQuestionId
-                    ? () => {
-                        const found = questions.find(
-                          (item) => item.id === q.sourceQuestionId,
-                        );
-                        if (found) {
-                          setSourceForModal(found);
+            {questions.map((q, i) => {
+              const pastIds = q.sourcePastExamIds;
+              return (
+                <SortableItem
+                  key={q.id}
+                  question={q}
+                  index={i}
+                  editing={editingId === q.id}
+                  onStartEdit={() => setEditingId(q.id)}
+                  onCancelEdit={() => setEditingId(null)}
+                  onSave={(patch) => {
+                    update(q.id, patch);
+                    setEditingId(null);
+                  }}
+                  onDelete={() => {
+                    if (confirm("この問題を削除しますか?")) remove(q.id);
+                  }}
+                  onToggleSelect={() => toggleSelect(q.id)}
+                  onMoveUp={i > 0 ? () => move(q.id, "up") : undefined}
+                  onMoveDown={
+                    i < questions.length - 1
+                      ? () => move(q.id, "down")
+                      : undefined
+                  }
+                  onGenerateSimilar={
+                    onGenerateSimilar ? () => onGenerateSimilar(q) : undefined
+                  }
+                  onShowSource={
+                    q.sourceQuestionId
+                      ? () => {
+                          const found = questions.find(
+                            (item) => item.id === q.sourceQuestionId,
+                          );
+                          if (found) {
+                            setSourceForModal(found);
+                          }
                         }
-                      }
-                    : undefined
-                }
-                onShowPastExamReferences={
-                  q.sourcePastExamIds && q.sourcePastExamIds.length > 0
-                    ? () => setPastRefsForModal(q.sourcePastExamIds)
-                    : undefined
-                }
-              />
-            ))}
+                      : undefined
+                  }
+                  onShowPastExamReferences={
+                    pastIds && pastIds.length > 0
+                      ? () => setPastRefsForModal([...pastIds])
+                      : undefined
+                  }
+                />
+              );
+            })}
           </div>
         </SortableContext>
       </DndContext>

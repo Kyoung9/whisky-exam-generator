@@ -9,10 +9,7 @@ import { BottomNav } from "@/components/whisky-quest/BottomNav";
 import { cloneQuestionsWithNewIds } from "@/lib/clone-generated-questions";
 import { loadExamSets } from "@/lib/exam-set-storage";
 import { stashQuestionsForGeneratorAppend } from "@/lib/generator-import-bridge";
-import {
-  fetchSavedSetById,
-  insertSavedSet,
-} from "@/lib/supabase/saved-sets-client";
+import { fetchSavedSetById } from "@/lib/supabase/saved-sets-client";
 import { useUser } from "@/lib/supabase/use-user";
 import { useExamSets } from "@/lib/use-exam-sets";
 import type { ExamSet } from "@/types/exam-set";
@@ -60,8 +57,10 @@ export default function SetDetailPage() {
 
   useEffect(() => {
     if (!id) {
-      setLoading(false);
-      setLoadError("無効な ID です");
+      queueMicrotask(() => {
+        setLoading(false);
+        setLoadError("無効な ID です");
+      });
       return;
     }
     let cancelled = false;

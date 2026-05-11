@@ -56,9 +56,11 @@ function GenerateInner() {
 
   useEffect(() => {
     if (!editSetId) {
-      setEditTarget(null);
-      setEditBanner(null);
-      setEditLoadError(null);
+      queueMicrotask(() => {
+        setEditTarget(null);
+        setEditBanner(null);
+        setEditLoadError(null);
+      });
       return;
     }
     if (userLoading) return;

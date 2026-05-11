@@ -151,16 +151,16 @@
   --spacing-margin-desktop: 64px;
   --spacing-container-max: 1280px;
 
-  /* フォントファミリー */
-  --font-headline-lg: "Libre Caslon Text", serif;
-  --font-headline-lg-mobile: "Libre Caslon Text", serif;
-  --font-display-lg: "Libre Caslon Text", serif;
-  --font-title-md: "Manrope", sans-serif;
-  --font-body-lg: "Manrope", sans-serif;
-  --font-body-sm: "Manrope", sans-serif;
-  --font-label-caps: "JetBrains Mono", monospace;
+  /* フォントファミリー（next/font が html に注入する CSS 変数を参照） */
+  --font-headline-lg: var(--font-libre-caslon-text), serif;
+  --font-headline-lg-mobile: var(--font-libre-caslon-text), serif;
+  --font-display-lg: var(--font-libre-caslon-text), serif;
+  --font-title-md: var(--font-manrope), ui-sans-serif, sans-serif;
+  --font-body-lg: var(--font-manrope), ui-sans-serif, sans-serif;
+  --font-body-sm: var(--font-manrope), ui-sans-serif, sans-serif;
+  --font-label-caps: var(--font-jetbrains-mono), ui-monospace, monospace;
 
-  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system,
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, -apple-system,
     "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo",
     sans-serif;
 }

@@ -108,10 +108,12 @@ export function TastingPractice() {
 
   useEffect(() => {
     if (!practiceSetId) {
-      setSavedSetBuffer([]);
-      setSavedSetTitle("");
-      setSavedSetLoadError(null);
-      savedPracticeSetIdRef.current = null;
+      queueMicrotask(() => {
+        setSavedSetBuffer([]);
+        setSavedSetTitle("");
+        setSavedSetLoadError(null);
+        savedPracticeSetIdRef.current = null;
+      });
       return;
     }
     if (userLoading) return;

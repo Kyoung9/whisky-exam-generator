@@ -343,7 +343,9 @@ export function ArchiveLibrary({ query, onQueryChange }: ArchiveLibraryProps) {
       filteredRegions.length > 0 &&
       !filteredRegions.some((r) => r.id === regionId)
     ) {
-      setRegionId(filteredRegions[0]!.id);
+      queueMicrotask(() => {
+        setRegionId(filteredRegions[0]!.id);
+      });
     }
   }, [filteredRegions, regionId]);
 

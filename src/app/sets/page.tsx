@@ -75,28 +75,33 @@ export default function SetsPage() {
   const [localSetsCount, setLocalSetsCount] = useState(0);
 
   useEffect(() => {
-    if (userLoading || !user) {
-      setLocalSetsCount(0);
-      return;
-    }
-    setLocalSetsCount(loadExamSets().length);
+    queueMicrotask(() => {
+      if (userLoading || !user) {
+        setLocalSetsCount(0);
+        return;
+      }
+      setLocalSetsCount(loadExamSets().length);
+    });
   }, [user, userLoading]);
 
   useEffect(() => {
     if (listTab !== "community" || !user) return;
     let cancelled = false;
-    setCommunityLoading(true);
-    void fetchPublicSavedSets({
-      excludeOwn: true,
-      q: query.trim() || undefined,
-      limit: 60,
-    })
-      .then((data) => {
-        if (!cancelled) setCommunitySets(data);
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setCommunityLoading(true);
+      void fetchPublicSavedSets({
+        excludeOwn: true,
+        q: query.trim() || undefined,
+        limit: 60,
       })
-      .finally(() => {
-        if (!cancelled) setCommunityLoading(false);
-      });
+        .then((data) => {
+          if (!cancelled) setCommunitySets(data);
+        })
+        .finally(() => {
+          if (!cancelled) setCommunityLoading(false);
+        });
+    });
     return () => {
       cancelled = true;
     };
