@@ -179,7 +179,11 @@ function GenerateInner() {
                   science
                 </span>
               </div>
-              <GenerateForm onGenerated={(qs) => append(qs)} />
+              <GenerateForm
+                onGenerated={(qs) => append(qs)}
+                user={user}
+                userLoading={userLoading}
+              />
             </section>
 
             <section className="glass-panel rounded-xl p-4 sm:p-6">
@@ -282,7 +286,11 @@ function GenerateInner() {
             </div>
 
             {/* テーマで追加生成 */}
-            <ThemeGenerateForm onGenerated={(qs) => append(qs)} />
+            <ThemeGenerateForm
+              onGenerated={(qs) => append(qs)}
+              user={user}
+              userLoading={userLoading}
+            />
           </aside>
         </div>
       </main>
@@ -294,6 +302,8 @@ function GenerateInner() {
           source={similarSource}
           onClose={() => setSimilarSource(null)}
           onGenerated={(qs) => appendAfter(similarSource.id, qs)}
+          user={user}
+          userLoading={userLoading}
         />
       )}
 

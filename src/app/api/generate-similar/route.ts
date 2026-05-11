@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { callJsonChatWithOptionalReview } from "@/lib/ai-question-pipeline";
+import { requireAuthUser } from "@/lib/require-auth-api";
 import { buildSimilarPrompt } from "@/lib/prompts";
 import {
   aiResponseSchema,
@@ -14,6 +15,9 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  const auth = await requireAuthUser();
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await req.json();

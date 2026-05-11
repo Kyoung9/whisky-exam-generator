@@ -44,7 +44,7 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
   const [includeAnswer, setIncludeAnswer] = useState(true);
   const [includeExplanation, setIncludeExplanation] = useState(true);
   const [onlySelected, setOnlySelected] = useState(true);
-  /** iframe 内 PDF の見た目倍率（CSS zoom、ブラウザ依存あり） */
+  /** プレビュー表示倍率（transform: scale。iOS では CSS zoom が iframe と相性悪いため使わない） */
   const [previewZoom, setPreviewZoom] = useState<number>(1);
 
   const filtered = onlySelected
@@ -202,20 +202,37 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
                     プレビューのみ（ダウンロード PDF は常に 100%）
                   </span>
                 </div>
-                <div
-                  className="min-h-0 flex-1 overflow-auto"
-                  style={{
-                    zoom: previewZoom,
-                  }}
-                >
-                  <PDFViewer
-                    key={`${title}|${includeAnswer}|${includeExplanation}|${onlySelected}|${filtered.length}`}
-                    className="block min-h-[70dvh] w-full sm:min-h-[75dvh]"
-                    style={{ width: "100%", height: "100%", minHeight: "70dvh", border: "none" }}
-                    showToolbar={false}
+                {/* 高さは親 flex + absolute で確定させ、iframe に min-h-[70dvh] を載せない（モバイルで領域外にはみ出すのを防ぐ） */}
+                <div className="relative min-h-0 flex-1">
+                  <div
+                    className="absolute inset-0 overflow-auto [-webkit-overflow-scrolling:touch]"
+                    style={{ touchAction: "pan-x pan-y" }}
                   >
-                    <QuestionPdf questions={filtered} options={options} />
-                  </PDFViewer>
+                    <div
+                      className="box-border"
+                      style={{
+                        width: `${100 / previewZoom}%`,
+                        height: `${100 / previewZoom}%`,
+                        transform: `scale(${previewZoom})`,
+                        transformOrigin: "top left",
+                      }}
+                    >
+                      <PDFViewer
+                        key={`${title}|${includeAnswer}|${includeExplanation}|${onlySelected}|${filtered.length}`}
+                        className="block h-full min-h-0 w-full"
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          minHeight: 0,
+                          border: "none",
+                          display: "block",
+                        }}
+                        showToolbar={false}
+                      >
+                        <QuestionPdf questions={filtered} options={options} />
+                      </PDFViewer>
+                    </div>
+                  </div>
                 </div>
               </>
             ) : (

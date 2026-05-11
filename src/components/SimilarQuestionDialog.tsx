@@ -1,5 +1,7 @@
 "use client";
 
+import type { User } from "@supabase/supabase-js";
+import Link from "next/link";
 import { useState } from "react";
 import type { GeneratedQuestion } from "@/types/question";
 
@@ -16,20 +18,40 @@ type Props = {
   source: GeneratedQuestion;
   onClose: () => void;
   onGenerated: (questions: GeneratedQuestion[]) => void;
+  user: User | null;
+  userLoading: boolean;
 };
+
+const LOGIN_NEXT = "/generate";
 
 // 「似た問題」生成ダイアログ (README §3.11) - WhiskyQuest dark トーン
 export function SimilarQuestionDialog({
   source,
   onClose,
   onGenerated,
+  user,
+  userLoading,
 }: Props) {
   const [mode, setMode] = useState<Mode>("similar");
   const [count, setCount] = useState(3);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginCta, setShowLoginCta] = useState(false);
 
   async function submit() {
+    if (userLoading) {
+      setShowLoginCta(false);
+      setError(
+        "認証状態を確認しています。少し待ってから再度お試しください。",
+      );
+      return;
+    }
+    if (!user) {
+      setShowLoginCta(true);
+      setError("予想問題の生成にはログインが必要です。");
+      return;
+    }
+    setShowLoginCta(false);
     setLoading(true);
     setError(null);
     try {
@@ -62,6 +84,7 @@ export function SimilarQuestionDialog({
         }),
       });
       if (!res.ok) {
+        if (res.status === 401) setShowLoginCta(true);
         const data = (await res.json().catch(() => null)) as
           | { error?: string }
           | null;
@@ -145,12 +168,20 @@ export function SimilarQuestionDialog({
         </label>
 
         {error && (
-          <p
+          <div
             role="alert"
-            className="text-body-sm text-error border-error/40 bg-error/10 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+            className="text-body-sm text-error border-error/40 bg-error/10 space-y-2 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
           >
-            {error}
-          </p>
+            <p>{error}</p>
+            {showLoginCta ? (
+              <Link
+                href={`/login?next=${encodeURIComponent(LOGIN_NEXT)}`}
+                className="text-label-caps text-amber-gold inline-block font-[family-name:var(--font-label-caps)] underline-offset-4 hover:underline"
+              >
+                ログインへ
+              </Link>
+            ) : null}
+          </div>
         )}
 
         <div className="flex justify-end gap-2">

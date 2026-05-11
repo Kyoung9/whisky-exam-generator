@@ -1,5 +1,7 @@
 "use client";
 
+import type { User } from "@supabase/supabase-js";
+import Link from "next/link";
 import { useState } from "react";
 import { CollapsibleFilterCard } from "@/components/CollapsibleFilterCard";
 import {
@@ -18,7 +20,11 @@ import {
 
 type Props = {
   onGenerated: (questions: GeneratedQuestion[]) => void;
+  user: User | null;
+  userLoading: boolean;
 };
+
+const LOGIN_NEXT = "/generate";
 
 /*
  * メイン画面の生成フォーム (README §5.1)
@@ -35,7 +41,7 @@ function chipClass(active: boolean): string {
   ].join(" ");
 }
 
-export function GenerateForm({ onGenerated }: Props) {
+export function GenerateForm({ onGenerated, user, userLoading }: Props) {
   const [years, setYears] = useState<ExamYear[]>([...EXAM_YEARS]);
   const [categories, setCategories] = useState<Category[]>([...CATEGORIES]);
   const [types, setTypes] = useState<QuestionType[]>([
@@ -47,6 +53,7 @@ export function GenerateForm({ onGenerated }: Props) {
   const [includeExplanation, setIncludeExplanation] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showLoginCta, setShowLoginCta] = useState(false);
 
   function toggle<T>(arr: T[], value: T): T[] {
     return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
@@ -68,6 +75,19 @@ export function GenerateForm({ onGenerated }: Props) {
       setError("出題数は 1 以上を入力してください。");
       return;
     }
+    if (userLoading) {
+      setShowLoginCta(false);
+      setError(
+        "認証状態を確認しています。少し待ってから再度お試しください。",
+      );
+      return;
+    }
+    if (!user) {
+      setShowLoginCta(true);
+      setError("予想問題の生成にはログインが必要です。");
+      return;
+    }
+    setShowLoginCta(false);
     setError(null);
     setLoading(true);
     try {
@@ -84,6 +104,7 @@ export function GenerateForm({ onGenerated }: Props) {
         }),
       });
       if (!res.ok) {
+        if (res.status === 401) setShowLoginCta(true);
         const data = (await res.json().catch(() => null)) as
           | { error?: string }
           | null;
@@ -303,12 +324,20 @@ export function GenerateForm({ onGenerated }: Props) {
       </label>
 
       {error && (
-        <p
+        <div
           role="alert"
-          className="text-body-sm text-error border-error/40 bg-error/10 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+          className="text-body-sm text-error border-error/40 bg-error/10 space-y-2 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
         >
-          {error}
-        </p>
+          <p>{error}</p>
+          {showLoginCta ? (
+            <Link
+              href={`/login?next=${encodeURIComponent(LOGIN_NEXT)}`}
+              className="text-label-caps text-amber-gold inline-block font-[family-name:var(--font-label-caps)] underline-offset-4 hover:underline"
+            >
+              ログインへ
+            </Link>
+          ) : null}
+        </div>
       )}
 
       <button

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { callJsonChatWithOptionalReview } from "@/lib/ai-question-pipeline";
+import { requireAuthUser } from "@/lib/require-auth-api";
 import { getFilteredPastQuestions, pickRandomMapAnchor } from "@/lib/exams";
 import { buildGeneratePrompt } from "@/lib/prompts";
 import {
@@ -18,6 +19,9 @@ export const dynamic = "force-dynamic";
 const MAX_PAST_QUESTIONS_FOR_PROMPT = 30;
 
 export async function POST(req: Request) {
+  const auth = await requireAuthUser();
+  if (!auth.ok) return auth.response;
+
   let body: unknown;
   try {
     body = await req.json();
