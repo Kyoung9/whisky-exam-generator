@@ -17,7 +17,7 @@ type Props = {
   onGenerated: (questions: GeneratedQuestion[]) => void;
 };
 
-// テーマ別の追加生成（README §3.12）
+// テーマ別の追加生成 (README §3.12) - サイドバー用 glass パネル
 export function ThemeGenerateForm({ onGenerated }: Props) {
   const [theme, setTheme] = useState("");
   const [count, setCount] = useState(5);
@@ -48,8 +48,12 @@ export function ThemeGenerateForm({ onGenerated }: Props) {
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? `生成に失敗しました (HTTP ${res.status})`);
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(
+          data?.error ?? `生成に失敗しました (HTTP ${res.status})`,
+        );
       }
       const data = (await res.json()) as { questions: GeneratedQuestion[] };
       onGenerated(data.questions);
@@ -62,99 +66,133 @@ export function ThemeGenerateForm({ onGenerated }: Props) {
   }
 
   return (
-    <form
-      onSubmit={submit}
-      className="space-y-3 rounded-2xl border bg-white p-5 shadow-sm"
-    >
-      <div>
-        <h3 className="text-sm font-semibold">テーマで追加生成</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
+    <form onSubmit={submit} className="glass-panel rounded-xl p-4 sm:p-6">
+      <div className="mb-5">
+        <h3 className="text-title-md text-amber-gold mb-1 flex items-center gap-2 font-[family-name:var(--font-title-md)]">
+          <span
+            className="material-symbols-outlined text-base"
+            aria-hidden="true"
+          >
+            auto_awesome
+          </span>
+          テーマで追加生成
+        </h3>
+        <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
           例: スコッチの蒸留所所在地、バーボンの製法 など
         </p>
       </div>
 
-      <label className="block space-y-1 text-sm">
-        <span className="font-medium">テーマ</span>
-        <input
-          value={theme}
-          onChange={(e) => setTheme(e.target.value)}
-          placeholder="ジャパニーズウイスキーの歴史"
-          className="w-full rounded-lg border bg-white px-3 py-2"
-        />
-      </label>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="space-y-1 text-sm">
-          <span className="font-medium">数</span>
+      <div className="space-y-4">
+        <label className="block space-y-2">
+          <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+            テーマ
+          </span>
           <input
-            type="number"
-            min={1}
-            max={20}
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value) || 1)}
-            className="w-full rounded-lg border bg-white px-3 py-2"
+            value={theme}
+            onChange={(e) => setTheme(e.target.value)}
+            placeholder="ジャパニーズウイスキーの歴史"
+            className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
           />
         </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium">難易度</span>
-          <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-            className="w-full rounded-lg border bg-white px-3 py-2"
-          >
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
-                {DIFFICULTY_LABELS[d]}
+
+        <div className="grid grid-cols-2 gap-3">
+          <label className="space-y-2">
+            <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+              数
+            </span>
+            <input
+              type="number"
+              min={1}
+              max={20}
+              value={count}
+              onChange={(e) => setCount(Number(e.target.value) || 1)}
+              className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+            />
+          </label>
+          <label className="space-y-2">
+            <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+              難易度
+            </span>
+            <select
+              value={difficulty}
+              onChange={(e) => setDifficulty(e.target.value as Difficulty)}
+              className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+            >
+              {DIFFICULTIES.map((d) => (
+                <option key={d} value={d} className="bg-surface-charcoal">
+                  {DIFFICULTY_LABELS[d]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3">
+          <label className="space-y-2">
+            <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+              カテゴリー (任意)
+            </span>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as Category | "")}
+              className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+            >
+              <option value="" className="bg-surface-charcoal">
+                指定なし
               </option>
-            ))}
-          </select>
-        </label>
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c} className="bg-surface-charcoal">
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-2">
+            <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+              問題タイプ (任意)
+            </span>
+            <select
+              value={type}
+              onChange={(e) => setType(e.target.value as QuestionType | "")}
+              className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+            >
+              <option value="" className="bg-surface-charcoal">
+                指定なし
+              </option>
+              {QUESTION_TYPES.map((t) => (
+                <option key={t} value={t} className="bg-surface-charcoal">
+                  {QUESTION_TYPE_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {error && (
+          <p
+            role="alert"
+            className="text-body-sm text-error border-error/40 bg-error/10 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+          >
+            {error}
+          </p>
+        )}
+
+        <button type="submit" disabled={loading} className="amber-cta w-full">
+          {loading ? (
+            <>
+              <span
+                className="material-symbols-outlined animate-spin"
+                aria-hidden="true"
+              >
+                progress_activity
+              </span>
+              生成中…
+            </>
+          ) : (
+            "テーマで生成"
+          )}
+        </button>
       </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <label className="space-y-1 text-sm">
-          <span className="font-medium">カテゴリー（任意）</span>
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value as Category | "")}
-            className="w-full rounded-lg border bg-white px-3 py-2"
-          >
-            <option value="">指定なし</option>
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm">
-          <span className="font-medium">問題タイプ（任意）</span>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as QuestionType | "")}
-            className="w-full rounded-lg border bg-white px-3 py-2"
-          >
-            <option value="">指定なし</option>
-            {QUESTION_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {QUESTION_TYPE_LABELS[t]}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
-      )}
-
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
-      >
-        {loading ? "生成中…" : "テーマで生成"}
-      </button>
     </form>
   );
 }

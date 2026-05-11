@@ -18,7 +18,7 @@ type Props = {
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
 };
 
-// 表示専用カード（README §3.5 / §5.2）
+// 表示専用カード (README §3.5 / §5.2) - WhiskyQuest dark / glass トーン
 export function QuestionCard({
   index,
   question,
@@ -30,43 +30,51 @@ export function QuestionCard({
   onMoveDown,
   dragHandleProps,
 }: Props) {
+  const selected = question.selected;
   return (
-    <article className="rounded-2xl border bg-white p-5 shadow-sm">
-      <header className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-        <span className="rounded bg-stone-900 px-2 py-0.5 font-mono text-white">
-          Q{index + 1}
+    <article
+      className={`glass-card rounded-xl p-5 transition-colors ${
+        selected ? "ring-amber-gold/60 ring-1" : ""
+      }`}
+    >
+      {/* メタ ヘッダー */}
+      <header className="mb-4 flex flex-wrap items-center gap-2">
+        <span className="text-label-caps bg-amber-gold text-cask-brown rounded px-2 py-1 font-[family-name:var(--font-label-caps)]">
+          Q{String(index + 1).padStart(2, "0")}
         </span>
-        <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900">
+        <span className="text-label-caps border-amber-gold/40 text-amber-gold rounded-full border px-2.5 py-0.5 font-[family-name:var(--font-label-caps)]">
           {question.category}
         </span>
-        <span className="rounded bg-stone-100 px-2 py-0.5 text-stone-700">
+        <span className="text-label-caps border-glass-stroke text-on-surface-variant rounded-full border px-2.5 py-0.5 font-[family-name:var(--font-label-caps)]">
           {QUESTION_TYPE_LABELS[question.type]}
         </span>
-        <span className="rounded bg-stone-100 px-2 py-0.5 text-stone-700">
+        <span className="text-label-caps border-glass-stroke text-on-surface-variant rounded-full border px-2.5 py-0.5 font-[family-name:var(--font-label-caps)]">
           {DIFFICULTY_LABELS[question.difficulty]}
         </span>
-        <span className="rounded bg-stone-100 px-2 py-0.5 text-stone-700">
-          テーマ: {question.theme}
+        <span className="text-label-caps text-outline font-[family-name:var(--font-label-caps)]">
+          THEME · {question.theme}
         </span>
-        <div className="ml-auto flex items-center gap-2">
-          {onToggleSelect && (
-            <label className="flex items-center gap-1 text-stone-700">
-              <input
-                type="checkbox"
-                checked={question.selected}
-                onChange={onToggleSelect}
-              />
-              PDF に含める
-            </label>
-          )}
-        </div>
+        {onToggleSelect && (
+          <label className="text-body-sm text-on-surface-variant ml-auto flex items-center gap-2 font-[family-name:var(--font-body-sm)]">
+            <input
+              type="checkbox"
+              checked={selected}
+              onChange={onToggleSelect}
+              className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
+            />
+            PDF に含める
+          </label>
+        )}
       </header>
 
-      <div className="space-y-3">
-        <p className="whitespace-pre-wrap text-base leading-relaxed">{question.body}</p>
+      {/* 本文 */}
+      <div className="space-y-4">
+        <p className="text-body-lg text-on-surface leading-relaxed whitespace-pre-wrap font-[family-name:var(--font-body-lg)]">
+          {question.body}
+        </p>
 
         {question.imageRef && (
-          <figure className="overflow-hidden rounded-lg border bg-stone-50">
+          <figure className="border-glass-stroke bg-surface-container-low overflow-hidden rounded-lg border">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={question.imageRef}
@@ -74,7 +82,7 @@ export function QuestionCard({
               className="mx-auto max-h-80 w-auto"
             />
             {question.imageDescription && (
-              <figcaption className="border-t bg-white px-3 py-1.5 text-xs text-stone-500">
+              <figcaption className="border-glass-stroke text-body-sm text-on-surface-variant border-t bg-black/30 px-3 py-1.5 font-[family-name:var(--font-body-sm)]">
                 {question.imageDescription}
               </figcaption>
             )}
@@ -82,9 +90,12 @@ export function QuestionCard({
         )}
 
         {question.choices && question.choices.length > 0 && (
-          <ol className="space-y-1 pl-5 text-sm" type="1">
+          <ol className="space-y-2 pl-6">
             {question.choices.map((c, i) => (
-              <li key={i} className="list-decimal">
+              <li
+                key={i}
+                className="text-body-lg text-on-surface list-decimal font-[family-name:var(--font-body-lg)]"
+              >
                 {c}
               </li>
             ))}
@@ -92,55 +103,87 @@ export function QuestionCard({
         )}
 
         {question.answer && (
-          <div className="rounded-lg bg-emerald-50 px-3 py-2 text-sm">
-            <span className="font-semibold text-emerald-900">正解: </span>
-            <span className="whitespace-pre-wrap text-emerald-900">{question.answer}</span>
+          <div className="border-amber-gold/40 bg-amber-gold/10 rounded border-l-2 px-3 py-2">
+            <span className="text-label-caps text-amber-gold mr-2 font-[family-name:var(--font-label-caps)]">
+              正解
+            </span>
+            <span className="text-body-lg text-on-surface font-[family-name:var(--font-body-lg)] whitespace-pre-wrap">
+              {question.answer}
+            </span>
           </div>
         )}
 
         {question.explanation && (
-          <div className="rounded-lg bg-stone-50 px-3 py-2 text-sm text-stone-700">
-            <span className="font-semibold">解説: </span>
-            <span className="whitespace-pre-wrap">{question.explanation}</span>
+          <div className="border-glass-stroke bg-surface-container-low/40 rounded-lg border px-3 py-2">
+            <span className="text-label-caps text-on-surface-variant mr-2 font-[family-name:var(--font-label-caps)]">
+              解説
+            </span>
+            <span className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)] whitespace-pre-wrap">
+              {question.explanation}
+            </span>
           </div>
         )}
       </div>
 
-      <footer className="mt-4 flex flex-wrap items-center gap-2 text-xs">
+      {/* アクション フッター */}
+      <footer className="border-glass-stroke mt-5 flex flex-wrap items-center gap-2 border-t pt-4">
         {dragHandleProps && (
           <button
             type="button"
             {...dragHandleProps}
-            className="cursor-grab rounded border px-2 py-1 hover:bg-stone-50 active:cursor-grabbing"
+            className="text-on-surface-variant border-glass-stroke hover:text-amber-gold hover:border-amber-gold cursor-grab rounded border px-2 py-1 transition-colors active:cursor-grabbing"
             aria-label="ドラッグして並び替え"
           >
-            ⋮⋮
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              drag_indicator
+            </span>
           </button>
         )}
         {onMoveUp && (
           <button
             type="button"
             onClick={onMoveUp}
-            className="rounded border px-2 py-1 hover:bg-stone-50"
+            aria-label="上へ"
+            className="text-on-surface-variant border-glass-stroke hover:text-amber-gold hover:border-amber-gold rounded border px-2 py-1 transition-colors"
           >
-            ↑
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              arrow_upward
+            </span>
           </button>
         )}
         {onMoveDown && (
           <button
             type="button"
             onClick={onMoveDown}
-            className="rounded border px-2 py-1 hover:bg-stone-50"
+            aria-label="下へ"
+            className="text-on-surface-variant border-glass-stroke hover:text-amber-gold hover:border-amber-gold rounded border px-2 py-1 transition-colors"
           >
-            ↓
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              arrow_downward
+            </span>
           </button>
         )}
         {onEdit && (
           <button
             type="button"
             onClick={onEdit}
-            className="rounded border px-3 py-1 hover:bg-stone-50"
+            className="amber-cta-outline"
           >
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              edit
+            </span>
             編集
           </button>
         )}
@@ -148,17 +191,29 @@ export function QuestionCard({
           <button
             type="button"
             onClick={onGenerateSimilar}
-            className="rounded border px-3 py-1 hover:bg-stone-50"
+            className="amber-cta-outline"
           >
-            似た問題を生成
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              auto_awesome
+            </span>
+            似た問題
           </button>
         )}
         {onDelete && (
           <button
             type="button"
             onClick={onDelete}
-            className="ml-auto rounded border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50"
+            className="text-label-caps border-error/60 text-error hover:bg-error/10 ml-auto inline-flex items-center gap-1 rounded-full border px-4 py-2 font-[family-name:var(--font-label-caps)] transition-colors"
           >
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              delete
+            </span>
             削除
           </button>
         )}

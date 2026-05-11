@@ -6,15 +6,16 @@ import type { GeneratedQuestion } from "@/types/question";
 
 // PdfPreviewModal は @react-pdf/renderer を抱えるためクライアント側で遅延ロード
 const PdfPreviewModal = dynamic(
-  () => import("@/components/PdfPreviewModal").then((m) => m.PdfPreviewModal),
-  { ssr: false }
+  () =>
+    import("@/components/PdfPreviewModal").then((m) => m.PdfPreviewModal),
+  { ssr: false },
 );
 
 type Props = {
   questions: GeneratedQuestion[];
 };
 
-// PDF プレビューモーダルを開くトリガー
+// アンバーゴールドの四角い一次CTA — PDF プレビューモーダルを開くトリガー
 export function PdfDownloadButton({ questions }: Props) {
   const [open, setOpen] = useState(false);
   const disabled = questions.length === 0;
@@ -25,12 +26,21 @@ export function PdfDownloadButton({ questions }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         disabled={disabled}
-        className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+        className="amber-cta w-full"
       >
+        <span
+          className="material-symbols-outlined"
+          aria-hidden="true"
+        >
+          picture_as_pdf
+        </span>
         PDF プレビュー / ダウンロード
       </button>
       {open && (
-        <PdfPreviewModal questions={questions} onClose={() => setOpen(false)} />
+        <PdfPreviewModal
+          questions={questions}
+          onClose={() => setOpen(false)}
+        />
       )}
     </>
   );

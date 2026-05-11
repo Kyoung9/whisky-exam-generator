@@ -18,8 +18,12 @@ type Props = {
   onGenerated: (questions: GeneratedQuestion[]) => void;
 };
 
-// 「似た問題」生成ダイアログ（README §3.11）
-export function SimilarQuestionDialog({ source, onClose, onGenerated }: Props) {
+// 「似た問題」生成ダイアログ (README §3.11) - WhiskyQuest dark トーン
+export function SimilarQuestionDialog({
+  source,
+  onClose,
+  onGenerated,
+}: Props) {
   const [mode, setMode] = useState<Mode>("similar");
   const [count, setCount] = useState(3);
   const [loading, setLoading] = useState(false);
@@ -48,11 +52,18 @@ export function SimilarQuestionDialog({ source, onClose, onGenerated }: Props) {
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? `生成に失敗しました (HTTP ${res.status})`);
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(
+          data?.error ?? `生成に失敗しました (HTTP ${res.status})`,
+        );
       }
       const data = (await res.json()) as { questions: GeneratedQuestion[] };
-      const tagged = data.questions.map((q) => ({ ...q, sourceQuestionId: source.id }));
+      const tagged = data.questions.map((q) => ({
+        ...q,
+        sourceQuestionId: source.id,
+      }));
       onGenerated(tagged);
       onClose();
     } catch (e) {
@@ -64,46 +75,71 @@ export function SimilarQuestionDialog({ source, onClose, onGenerated }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 pt-[max(0.75rem,env(safe-area-inset-top,0px))] pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
       role="dialog"
       aria-modal
+      aria-labelledby="similar-dialog-title"
     >
-      <div className="w-full max-w-md space-y-4 rounded-2xl bg-white p-6 shadow-xl">
-        <h3 className="text-lg font-semibold">この問題から追加生成</h3>
-
-        <div className="space-y-2 rounded-lg bg-stone-50 p-3 text-xs text-stone-700">
-          <p className="line-clamp-3 whitespace-pre-wrap">{source.body}</p>
+      <div className="glass-panel max-h-[min(90dvh,calc(100dvh-env(safe-area-inset-top,0px)-env(safe-area-inset-bottom,0px)-2rem))] w-full max-w-md space-y-5 overflow-y-auto overscroll-contain rounded-xl p-5 sm:p-6">
+        <div className="flex items-center gap-2">
+          <span
+            className="material-symbols-outlined text-amber-gold"
+            aria-hidden="true"
+          >
+            auto_awesome
+          </span>
+          <h3
+            id="similar-dialog-title"
+            className="text-title-md text-amber-gold font-[family-name:var(--font-title-md)]"
+          >
+            この問題から追加生成
+          </h3>
         </div>
 
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">モード</span>
+        <div className="border-glass-stroke bg-surface-container-low/60 rounded border-l-2 border-l-amber-gold/40 p-3">
+          <p className="text-body-sm text-on-surface-variant line-clamp-3 font-[family-name:var(--font-body-sm)] whitespace-pre-wrap">
+            {source.body}
+          </p>
+        </div>
+
+        <label className="block space-y-2">
+          <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+            モード
+          </span>
           <select
             value={mode}
             onChange={(e) => setMode(e.target.value as Mode)}
-            className="w-full rounded-lg border bg-white px-3 py-2"
+            className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
           >
             {(Object.keys(MODE_LABELS) as Mode[]).map((m) => (
-              <option key={m} value={m}>
+              <option key={m} value={m} className="bg-surface-charcoal">
                 {MODE_LABELS[m]}
               </option>
             ))}
           </select>
         </label>
 
-        <label className="block space-y-1 text-sm">
-          <span className="font-medium">生成数</span>
+        <label className="block space-y-2">
+          <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+            生成数
+          </span>
           <input
             type="number"
             min={1}
             max={10}
             value={count}
             onChange={(e) => setCount(Number(e.target.value) || 1)}
-            className="w-full rounded-lg border bg-white px-3 py-2"
+            className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
           />
         </label>
 
         {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+          <p
+            role="alert"
+            className="text-body-sm text-error border-error/40 bg-error/10 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+          >
+            {error}
+          </p>
         )}
 
         <div className="flex justify-end gap-2">
@@ -111,7 +147,7 @@ export function SimilarQuestionDialog({ source, onClose, onGenerated }: Props) {
             type="button"
             onClick={onClose}
             disabled={loading}
-            className="rounded border px-4 py-2 text-sm hover:bg-stone-50 disabled:opacity-50"
+            className="amber-cta-outline"
           >
             キャンセル
           </button>
@@ -119,9 +155,29 @@ export function SimilarQuestionDialog({ source, onClose, onGenerated }: Props) {
             type="button"
             onClick={submit}
             disabled={loading}
-            className="rounded bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            className="amber-cta px-6 py-3"
           >
-            {loading ? "生成中…" : "生成する"}
+            {loading ? (
+              <>
+                <span
+                  className="material-symbols-outlined animate-spin"
+                  aria-hidden="true"
+                >
+                  progress_activity
+                </span>
+                生成中…
+              </>
+            ) : (
+              <>
+                <span
+                  className="material-symbols-outlined text-base"
+                  aria-hidden="true"
+                >
+                  auto_awesome
+                </span>
+                生成する
+              </>
+            )}
           </button>
         </div>
       </div>

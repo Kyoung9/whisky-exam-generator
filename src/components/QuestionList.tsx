@@ -83,7 +83,7 @@ function SortableItem({
   );
 }
 
-// 一覧 + 一括操作 + DnD（README §3.5–§3.10）
+// 一覧 + 一括操作 + DnD (README §3.5–§3.10) - WhiskyQuest dark トーン
 export function QuestionList({ onGenerateSimilar }: Props) {
   const {
     questions,
@@ -98,7 +98,7 @@ export function QuestionList({ onGenerateSimilar }: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 4 } })
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
   );
 
   function onDragEnd(e: DragEndEvent) {
@@ -113,9 +113,17 @@ export function QuestionList({ onGenerateSimilar }: Props) {
 
   if (questions.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed bg-white px-6 py-10 text-center text-sm text-muted-foreground">
-        まだ問題がありません。上のフォームから生成してください。
-      </p>
+      <div className="border-glass-stroke rounded-xl border border-dashed px-6 py-12 text-center">
+        <span
+          className="material-symbols-outlined text-amber-gold/40 mb-3 text-5xl"
+          aria-hidden="true"
+        >
+          inventory_2
+        </span>
+        <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+          まだ問題がありません。上のフォームから生成してください。
+        </p>
+      </div>
     );
   }
 
@@ -124,16 +132,18 @@ export function QuestionList({ onGenerateSimilar }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white px-4 py-3 text-sm">
-        <span className="font-medium">{questions.length} 問</span>
-        <span className="text-muted-foreground">
-          （選択中 {selectedIds.length} 問）
+      <div className="border-glass-stroke flex flex-wrap items-center gap-2 rounded-lg border bg-white/[0.02] px-3 py-3 sm:px-4">
+        <span className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)]">
+          {questions.length} 問
         </span>
-        <div className="ml-auto flex flex-wrap gap-2">
+        <span className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+          選択中 {selectedIds.length}
+        </span>
+        <div className="ml-auto flex w-full flex-wrap gap-2 sm:ml-auto sm:w-auto sm:justify-end">
           <button
             type="button"
             onClick={() => selectAll(!allSelected)}
-            className="rounded border px-3 py-1 hover:bg-stone-50"
+            className="amber-cta-outline min-h-10"
           >
             {allSelected ? "全解除" : "全選択"}
           </button>
@@ -141,11 +151,14 @@ export function QuestionList({ onGenerateSimilar }: Props) {
             type="button"
             onClick={() => {
               if (selectedIds.length === 0) return;
-              if (!confirm(`選択した ${selectedIds.length} 問を削除しますか？`)) return;
+              if (
+                !confirm(`選択した ${selectedIds.length} 問を削除しますか?`)
+              )
+                return;
               removeMany(selectedIds);
             }}
             disabled={selectedIds.length === 0}
-            className="rounded border border-red-300 px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-40"
+            className="text-label-caps border-error/60 text-error hover:bg-error/10 min-h-10 rounded-full border px-4 py-2 font-[family-name:var(--font-label-caps)] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
           >
             選択を一括削除
           </button>
@@ -175,12 +188,14 @@ export function QuestionList({ onGenerateSimilar }: Props) {
                   setEditingId(null);
                 }}
                 onDelete={() => {
-                  if (confirm("この問題を削除しますか？")) remove(q.id);
+                  if (confirm("この問題を削除しますか?")) remove(q.id);
                 }}
                 onToggleSelect={() => toggleSelect(q.id)}
                 onMoveUp={i > 0 ? () => move(q.id, "up") : undefined}
                 onMoveDown={
-                  i < questions.length - 1 ? () => move(q.id, "down") : undefined
+                  i < questions.length - 1
+                    ? () => move(q.id, "down")
+                    : undefined
                 }
                 onGenerateSimilar={
                   onGenerateSimilar ? () => onGenerateSimilar(q) : undefined

@@ -7,7 +7,7 @@ type Props = {
   onChange: (next: ExamYear[]) => void;
 };
 
-// 過去問題の年度を複数選択するコンポーネント
+// 過去問題の年度を複数選択するコンポーネント (amber-gold チップ)
 export function ExamSelector({ selected, onChange }: Props) {
   const allChecked = selected.length === EXAM_YEARS.length;
 
@@ -24,13 +24,15 @@ export function ExamSelector({ selected, onChange }: Props) {
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">過去問題の年度</span>
+        <span className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+          過去問題の年度
+        </span>
         <button
           type="button"
           onClick={toggleAll}
-          className="text-xs text-primary hover:underline"
+          className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)] transition-opacity hover:opacity-80"
         >
           {allChecked ? "全解除" : "全選択"}
         </button>
@@ -41,10 +43,10 @@ export function ExamSelector({ selected, onChange }: Props) {
           return (
             <label
               key={year}
-              className={`cursor-pointer rounded-full border px-3 py-1 text-sm transition ${
+              className={`text-label-caps cursor-pointer rounded-full border px-4 py-2 font-[family-name:var(--font-label-caps)] transition-all ${
                 checked
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-border bg-white text-foreground hover:border-primary"
+                  ? "border-amber-gold bg-amber-gold text-cask-brown"
+                  : "border-glass-stroke text-on-surface-variant hover:border-amber-gold hover:text-amber-gold"
               }`}
             >
               <input

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExamSelector } from "@/components/ExamSelector";
+import { CollapsibleFilterCard } from "@/components/CollapsibleFilterCard";
 import {
   CATEGORIES,
   DIFFICULTIES,
@@ -20,11 +20,28 @@ type Props = {
   onGenerated: (questions: GeneratedQuestion[]) => void;
 };
 
-// メイン画面の生成フォーム（README §5.1）
+/*
+ * メイン画面の生成フォーム (README §5.1)
+ * Stitch 「蒸留設定」mobile デザインのアーカイブ・フィルタ パターンに合わせて
+ * 年度・カテゴリー・問題タイプを折りたたみ可能なグラスカード化。
+ */
+
+function chipClass(active: boolean): string {
+  return [
+    "text-label-caps cursor-pointer rounded-full border px-4 py-2 font-[family-name:var(--font-label-caps)] transition-all",
+    active
+      ? "border-amber-gold bg-amber-gold text-cask-brown"
+      : "border-glass-stroke text-on-surface-variant hover:border-amber-gold hover:text-amber-gold",
+  ].join(" ");
+}
+
 export function GenerateForm({ onGenerated }: Props) {
   const [years, setYears] = useState<ExamYear[]>([...EXAM_YEARS]);
   const [categories, setCategories] = useState<Category[]>([...CATEGORIES]);
-  const [types, setTypes] = useState<QuestionType[]>(["multiple_choice", "true_false_count"]);
+  const [types, setTypes] = useState<QuestionType[]>([
+    "multiple_choice",
+    "true_false_count",
+  ]);
   const [count, setCount] = useState(10);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [includeExplanation, setIncludeExplanation] = useState(true);
@@ -33,6 +50,12 @@ export function GenerateForm({ onGenerated }: Props) {
 
   function toggle<T>(arr: T[], value: T): T[] {
     return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+  }
+
+  function summary(selected: number, total: number): string {
+    if (selected === 0) return "未選択";
+    if (selected === total) return "全選択";
+    return `${selected} / ${total}`;
   }
 
   async function onSubmit(e: React.FormEvent) {
@@ -57,8 +80,12 @@ export function GenerateForm({ onGenerated }: Props) {
         }),
       });
       if (!res.ok) {
-        const data = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(data?.error ?? `生成に失敗しました (HTTP ${res.status})`);
+        const data = (await res.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        throw new Error(
+          data?.error ?? `生成に失敗しました (HTTP ${res.status})`,
+        );
       }
       const data = (await res.json()) as { questions: GeneratedQuestion[] };
       onGenerated(data.questions);
@@ -69,110 +96,222 @@ export function GenerateForm({ onGenerated }: Props) {
     }
   }
 
+  const yearsAll = years.length === EXAM_YEARS.length;
+  const catsAll = categories.length === CATEGORIES.length;
+
   return (
-    <form onSubmit={onSubmit} className="space-y-6 rounded-2xl border bg-white p-6 shadow-sm">
-      <ExamSelector selected={years} onChange={setYears} />
+    <form onSubmit={onSubmit} className="space-y-6">
+      {/* アーカイブ・フィルタ (折りたたみカード) */}
+      <div className="space-y-3">
+        <h3 className="text-label-caps text-amber-gold px-1 font-[family-name:var(--font-label-caps)]">
+          アーカイブ・フィルタ
+        </h3>
 
-      <div className="space-y-2">
-        <span className="text-sm font-medium">カテゴリー</span>
-        <div className="flex flex-wrap gap-2">
-          {CATEGORIES.map((c) => {
-            const checked = categories.includes(c);
-            return (
-              <label
-                key={c}
-                className={`cursor-pointer rounded-full border px-3 py-1 text-sm ${
-                  checked
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-white hover:border-primary"
-                }`}
-              >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={checked}
-                  onChange={() => setCategories(toggle(categories, c))}
-                />
-                {c}
-              </label>
-            );
-          })}
-        </div>
+        {/* 年度 — 既定で開いた状態。最重要フィルタ */}
+        <CollapsibleFilterCard
+          icon="calendar_month"
+          title="過去問題の年度"
+          summary={summary(years.length, EXAM_YEARS.length)}
+          defaultOpen
+        >
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setYears(yearsAll ? [] : [...EXAM_YEARS])}
+              className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)] transition-opacity hover:opacity-80"
+            >
+              {yearsAll ? "全解除" : "全選択"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {EXAM_YEARS.map((y) => {
+              const checked = years.includes(y);
+              return (
+                <label key={y} className={chipClass(checked)}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={checked}
+                    onChange={() =>
+                      setYears(
+                        checked
+                          ? years.filter((v) => v !== y)
+                          : [...years, y].sort((a, b) => a - b),
+                      )
+                    }
+                  />
+                  {y}年度
+                </label>
+              );
+            })}
+          </div>
+        </CollapsibleFilterCard>
+
+        {/* カテゴリー — チップ数が多いので折りたたみ */}
+        <CollapsibleFilterCard
+          icon="category"
+          title="カテゴリー"
+          summary={summary(categories.length, CATEGORIES.length)}
+        >
+          <div className="mb-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setCategories(catsAll ? [] : [...CATEGORIES])}
+              className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)] transition-opacity hover:opacity-80"
+            >
+              {catsAll ? "全解除" : "全選択"}
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map((c) => {
+              const checked = categories.includes(c);
+              return (
+                <label key={c} className={chipClass(checked)}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={checked}
+                    onChange={() => setCategories(toggle(categories, c))}
+                  />
+                  {c}
+                </label>
+              );
+            })}
+          </div>
+        </CollapsibleFilterCard>
+
+        {/* 問題タイプ */}
+        <CollapsibleFilterCard
+          icon="quiz"
+          title="問題タイプ"
+          summary={summary(types.length, QUESTION_TYPES.length)}
+        >
+          <div className="flex flex-wrap gap-2">
+            {QUESTION_TYPES.map((t) => {
+              const checked = types.includes(t);
+              return (
+                <label key={t} className={chipClass(checked)}>
+                  <input
+                    type="checkbox"
+                    className="sr-only"
+                    checked={checked}
+                    onChange={() => setTypes(toggle(types, t))}
+                  />
+                  {QUESTION_TYPE_LABELS[t]}
+                </label>
+              );
+            })}
+          </div>
+        </CollapsibleFilterCard>
       </div>
 
-      <div className="space-y-2">
-        <span className="text-sm font-medium">問題タイプ</span>
-        <div className="flex flex-wrap gap-2">
-          {QUESTION_TYPES.map((t) => {
-            const checked = types.includes(t);
+      {/* 習熟レベル — 横並びチップ (Stitch 蒸留設定 mobile デザイン) */}
+      <div className="space-y-3">
+        <span className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+          難易度
+        </span>
+        <div
+          role="radiogroup"
+          aria-label="難易度"
+          className="hide-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+        >
+          {DIFFICULTIES.map((d) => {
+            const active = difficulty === d;
             return (
-              <label
-                key={t}
-                className={`cursor-pointer rounded-full border px-3 py-1 text-sm ${
-                  checked
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-white hover:border-primary"
+              <button
+                key={d}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setDifficulty(d)}
+                className={`text-label-caps shrink-0 rounded-full border px-5 py-2.5 font-[family-name:var(--font-label-caps)] transition-all ${
+                  active
+                    ? "border-amber-gold bg-amber-gold text-cask-brown"
+                    : "border-glass-stroke bg-glass-fill text-on-surface-variant hover:border-amber-gold hover:text-amber-gold"
                 }`}
               >
-                <input
-                  type="checkbox"
-                  className="sr-only"
-                  checked={checked}
-                  onChange={() => setTypes(toggle(types, t))}
-                />
-                {QUESTION_TYPE_LABELS[t]}
-              </label>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <label className="space-y-1">
-          <span className="text-sm font-medium">問題数</span>
-          <input
-            type="number"
-            min={1}
-            max={30}
-            value={count}
-            onChange={(e) => setCount(Number(e.target.value) || 1)}
-            className="w-full rounded-lg border bg-white px-3 py-2"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-sm font-medium">難易度</span>
-          <select
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value as Difficulty)}
-            className="w-full rounded-lg border bg-white px-3 py-2"
-          >
-            {DIFFICULTIES.map((d) => (
-              <option key={d} value={d}>
                 {DIFFICULTY_LABELS[d]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex items-end space-x-2 pb-2">
-          <input
-            type="checkbox"
-            checked={includeExplanation}
-            onChange={(e) => setIncludeExplanation(e.target.checked)}
-          />
-          <span className="text-sm">解説を含める</span>
-        </label>
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {/* 出題数 — スライダー + バッジ */}
+      <div className="border-glass-stroke bg-glass-fill rounded-xl border p-4 sm:p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <label
+            htmlFor="generate-count"
+            className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)]"
+          >
+            出題数
+          </label>
+          <span className="text-label-caps text-on-surface font-[family-name:var(--font-label-caps)] tabular-nums">
+            {count} 問
+          </span>
+        </div>
+        <input
+          id="generate-count"
+          type="range"
+          min={1}
+          max={30}
+          value={count}
+          onChange={(e) => setCount(Number(e.target.value) || 1)}
+          aria-valuemin={1}
+          aria-valuemax={30}
+          aria-valuenow={count}
+          className="w-full"
+        />
+        <div className="text-on-surface-variant mt-2 flex justify-between text-[10px] font-[family-name:var(--font-label-caps)]">
+          <span>1</span>
+          <span>30</span>
+        </div>
+      </div>
+
+      {/* 解説を含める */}
+      <label className="border-glass-stroke bg-glass-fill flex cursor-pointer items-center gap-3 rounded-xl border p-4">
+        <input
+          type="checkbox"
+          checked={includeExplanation}
+          onChange={(e) => setIncludeExplanation(e.target.checked)}
+          className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
+        />
+        <span className="text-body-lg flex-1 font-[family-name:var(--font-body-lg)]">
+          解説を含める
+        </span>
+        <span className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+          {includeExplanation ? "ON" : "OFF"}
+        </span>
+      </label>
 
       {error && (
-        <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+        <p
+          role="alert"
+          className="text-body-sm text-error border-error/40 bg-error/10 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+        >
+          {error}
+        </p>
       )}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="w-full rounded-lg bg-primary px-4 py-3 font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50"
-      >
-        {loading ? "生成中…" : "予想問題を生成"}
+      <button type="submit" disabled={loading} className="amber-cta w-full">
+        {loading ? (
+          <>
+            <span
+              className="material-symbols-outlined animate-spin"
+              aria-hidden="true"
+            >
+              progress_activity
+            </span>
+            生成中…
+          </>
+        ) : (
+          <>
+            <span className="material-symbols-outlined" aria-hidden="true">
+              science
+            </span>
+            予想問題を生成
+          </>
+        )}
       </button>
     </form>
   );

@@ -1,35 +1,435 @@
 @import "tailwindcss";
 
+/*
+ * WhiskyQuest - Dark whisky / amber gold design tokens
+ * Source: Stitch design (Material 3 dark theme + custom whisky palette)
+ */
 :root {
-  --background: #fafaf9;
-  --foreground: #1c1917;
-  --primary: #b45309;
-  --primary-foreground: #ffffff;
-  --muted: #f5f5f4;
-  --muted-foreground: #57534e;
-  --border: #e7e5e4;
+  --background: #0F0F0F;
+  --background-deep: #0F0F0F;
+  --foreground: #ede1d0;
+
+  --surface: #181309;
+  --surface-tint: #fbbc00;
+  --surface-bright: #3f382d;
+  --surface-dim: #181309;
+  --surface-charcoal: #1A1A1A;
+  --surface-variant: #3a3428;
+  --surface-container-lowest: #120e05;
+  --surface-container-low: #201b11;
+  --surface-container: #241f14;
+  --surface-container-high: #2f291e;
+  --surface-container-highest: #3a3428;
+
+  --on-background: #ede1d0;
+  --on-surface: #ede1d0;
+  --on-surface-variant: #d4c5ab;
+  --inverse-surface: #ede1d0;
+  --inverse-on-surface: #363024;
+  --inverse-primary: #795900;
+
+  --primary: #ffe2ab;
+  --primary-fixed: #ffdfa0;
+  --primary-fixed-dim: #fbbc00;
+  --primary-container: #ffbf00;
+  --on-primary: #402d00;
+  --on-primary-container: #6d5000;
+  --on-primary-fixed: #261a00;
+  --on-primary-fixed-variant: #5c4300;
+
+  --secondary: #dec1af;
+  --secondary-container: #574335;
+  --secondary-fixed: #fbddca;
+  --secondary-fixed-dim: #dec1af;
+  --on-secondary: #3f2c20;
+  --on-secondary-container: #ccb09f;
+  --on-secondary-fixed: #28180d;
+  --on-secondary-fixed-variant: #574335;
+
+  --tertiary: #e8e5e4;
+  --tertiary-container: #cbc9c8;
+  --tertiary-fixed: #e5e2e1;
+  --tertiary-fixed-dim: #c8c6c5;
+  --on-tertiary: #313030;
+  --on-tertiary-container: #555454;
+  --on-tertiary-fixed: #1c1b1b;
+  --on-tertiary-fixed-variant: #474746;
+
+  --error: #ffb4ab;
+  --error-container: #93000a;
+  --on-error: #690005;
+  --on-error-container: #ffdad6;
+
+  --outline: #9c8f78;
+  --outline-variant: #504532;
+
+  --amber-gold: #FFBF00;
+  --cask-brown: #3D2B1F;
+
+  --glass-fill: rgba(26, 26, 26, 0.6);
+  --glass-stroke: rgba(255, 255, 255, 0.12);
 }
 
 @theme inline {
+  /* カラートークン */
   --color-background: var(--background);
+  --color-background-deep: var(--background-deep);
   --color-foreground: var(--foreground);
+
+  --color-surface: var(--surface);
+  --color-surface-tint: var(--surface-tint);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-charcoal: var(--surface-charcoal);
+  --color-surface-variant: var(--surface-variant);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+
+  --color-on-background: var(--on-background);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-inverse-surface: var(--inverse-surface);
+  --color-inverse-on-surface: var(--inverse-on-surface);
+  --color-inverse-primary: var(--inverse-primary);
+
   --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-border: var(--border);
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Hiragino Kaku Gothic ProN",
-    "Hiragino Sans", "Yu Gothic", "Meiryo", sans-serif;
+  --color-primary-fixed: var(--primary-fixed);
+  --color-primary-fixed-dim: var(--primary-fixed-dim);
+  --color-primary-container: var(--primary-container);
+  --color-on-primary: var(--on-primary);
+  --color-on-primary-container: var(--on-primary-container);
+  --color-on-primary-fixed: var(--on-primary-fixed);
+  --color-on-primary-fixed-variant: var(--on-primary-fixed-variant);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-secondary-fixed: var(--secondary-fixed);
+  --color-secondary-fixed-dim: var(--secondary-fixed-dim);
+  --color-on-secondary: var(--on-secondary);
+  --color-on-secondary-container: var(--on-secondary-container);
+  --color-on-secondary-fixed: var(--on-secondary-fixed);
+  --color-on-secondary-fixed-variant: var(--on-secondary-fixed-variant);
+
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-tertiary-fixed: var(--tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--tertiary-fixed-dim);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+  --color-on-tertiary-fixed: var(--on-tertiary-fixed);
+  --color-on-tertiary-fixed-variant: var(--on-tertiary-fixed-variant);
+
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-on-error: var(--on-error);
+  --color-on-error-container: var(--on-error-container);
+
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  --color-amber-gold: var(--amber-gold);
+  --color-cask-brown: var(--cask-brown);
+
+  /* ボーダー半径
+   * Source: WhiskyQuest Design System (rounded scale)
+   * sm 0.125 / DEFAULT 0.25 / md 0.375 / lg 0.5 / xl 0.75 / full 9999px
+   */
+  --radius-sm: 0.125rem;
+  --radius: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+
+  /* スペーシング */
+  --spacing-unit: 8px;
+  --spacing-gutter: 24px;
+  --spacing-margin-mobile: 16px;
+  --spacing-margin-desktop: 64px;
+  --spacing-container-max: 1280px;
+
+  /* フォントファミリー */
+  --font-headline-lg: "Libre Caslon Text", serif;
+  --font-headline-lg-mobile: "Libre Caslon Text", serif;
+  --font-display-lg: "Libre Caslon Text", serif;
+  --font-title-md: "Manrope", sans-serif;
+  --font-body-lg: "Manrope", sans-serif;
+  --font-body-sm: "Manrope", sans-serif;
+  --font-label-caps: "JetBrains Mono", monospace;
+
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system,
+    "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", "Meiryo",
+    sans-serif;
+}
+
+/* タイポグラフィのユーティリティ
+ * Stitch のデザインスペックをそのまま再現
+ */
+.text-display-lg {
+  font-size: 48px;
+  line-height: 56px;
+  letter-spacing: -0.02em;
+  font-weight: 700;
+}
+.text-headline-lg {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 600;
+}
+.text-headline-lg-mobile {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+}
+.text-title-md {
+  font-size: 18px;
+  line-height: 24px;
+  font-weight: 600;
+}
+.text-body-lg {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+.text-body-sm {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.text-label-caps {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* グラスモーフィズム パネル
+ * Stitch HTML では .glass-panel と .glass-card の両方の呼称が登場するため、
+ * 同じ装飾を両方のクラスで提供する (alias)。
+ */
+.glass-panel,
+.glass-card {
+  background: var(--glass-fill);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-stroke);
+}
+
+/* 暗背景上のフォーム共通基本トーン
+ * - 透明背景 + 下線のみで「アーカイブ的なミニマルさ」を表現
+ * - amber gold focus / outline color はトークンから引く
+ */
+.dark-field {
+  background: transparent;
+  color: var(--on-surface);
+  border: 1px solid var(--glass-stroke);
+  border-radius: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  outline: none;
+  transition: border-color 150ms ease;
+}
+.dark-field::placeholder {
+  color: var(--outline);
+}
+.dark-field:hover {
+  border-color: rgba(255, 191, 0, 0.4);
+}
+.dark-field:focus,
+.dark-field:focus-visible {
+  border-color: var(--amber-gold);
+  box-shadow: 0 0 0 1px rgba(255, 191, 0, 0.4);
+}
+
+/* アンバーゴールドの「四角い」一次CTA (Stitch 試験設定の "試験を蒸留する" 風) */
+.amber-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--amber-gold);
+  color: var(--cask-brown);
+  font-family: var(--font-label-caps);
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 700;
+  padding: 1rem 1.25rem;
+  border-radius: 0;
+  box-shadow: 0 16px 32px -16px rgba(255, 191, 0, 0.35);
+  transition:
+    filter 150ms ease,
+    transform 150ms ease;
+}
+.amber-cta:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+.amber-cta:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.amber-cta:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 二次CTA: アンバー枠線のみ (誤答を優先, 全選択 等) */
+.amber-cta-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: transparent;
+  color: var(--amber-gold);
+  font-family: var(--font-label-caps);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 500;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  border: 1px solid var(--amber-gold);
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+}
+.amber-cta-outline:hover:not(:disabled) {
+  background: rgba(255, 191, 0, 0.1);
+}
+.amber-cta-outline:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.bg-glass-fill {
+  background: var(--glass-fill);
+}
+.border-glass-stroke {
+  border-color: var(--glass-stroke);
+}
+
+/* センソリーパレット用の同心円とレーダー */
+.flavor-ring {
+  border: 1px solid rgba(255, 191, 0, 0.15);
+}
+.radar-shape {
+  clip-path: polygon(50% 10%, 85% 30%, 85% 70%, 50% 90%, 15% 70%, 15% 30%);
+}
+
+/* Material Symbols のデフォルト軸 */
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+}
+
+/* 熟成チャート用 amber → cask の縦グラデーション */
+.maturation-gradient {
+  background: linear-gradient(180deg, #ffbf00 0%, #3d2b1f 100%);
+}
+
+/* プログレスバー用（Stitch 試験 UI）— cask → amber 横方向 */
+.maturation-gradient-horizontal {
+  background: linear-gradient(90deg, #3d2b1f 0%, #ffbf00 100%);
+}
+
+/* 選択肢の確定状態（Stitch .inner-glow-active） */
+.inner-glow-active {
+  box-shadow: inset 0 0 15px rgba(255, 191, 0, 0.05);
+  border-color: var(--amber-gold);
+}
+
+/* 選択中の選択肢などに使う内側グロー */
+.inner-glow {
+  box-shadow: inset 0 0 20px rgba(255, 191, 0, 0.05);
+}
+
+/* ナレッジホイール (Knowledge Wheel) のアンバー光彩 */
+.flavor-wheel-svg {
+  filter: drop-shadow(0 0 8px rgba(255, 191, 0, 0.3));
+}
+
+/* カスタム レンジ スライダー (試験設定の問題数 / 制限時間) */
+input[type="range"] {
+  -webkit-appearance: none;
+  background: transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  background: var(--cask-brown);
+  height: 2px;
+}
+input[type="range"]::-moz-range-track {
+  background: var(--cask-brown);
+  height: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: var(--amber-gold);
+  margin-top: -7px;
+  cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  height: 16px;
+  width: 16px;
+  border-radius: 9999px;
+  background: var(--amber-gold);
+  border: none;
+  cursor: pointer;
+}
+
+html {
+  overflow-x: clip;
 }
 
 html,
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--background-deep);
+  color: var(--on-surface);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
 
+body {
+  overflow-x: clip;
+}
+
+/* Stitch アーカイブ HTML: 和文の見やすい改行 */
+html:lang(ja) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}
+
+/* ボトムナビがあるページの本文下余白 (ナビ高さ + セーフエリア + 余白) */
+.pb-with-bottom-nav {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px) + 0.75rem);
+}
+
+@media (min-width: 768px) {
+  .pb-with-bottom-nav {
+    padding-bottom: 0.75rem;
+  }
+}
+
 * {
-  border-color: var(--border);
+  border-color: var(--outline-variant);
+}
+
+/* モバイルでダブルタップズーム遅延を抑える */
+button,
+input[type="button"],
+input[type="submit"],
+[role="tab"] {
+  touch-action: manipulation;
+}
+
+/* 横スクロールチップ行用 — スクロールバー非表示 */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
