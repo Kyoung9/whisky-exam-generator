@@ -100,10 +100,11 @@ function GenerateInner() {
             </section>
           </div>
 
-          {/* サイドバー: 構成メトリクス + テーマ追加生成 */}
+          {/* サイドバー: 構成メトリクス + テーマ追加生成
+           * sticky をやめてページのスクロールと一緒に流れるようにする (内部スクロールなし) */}
           <aside className="space-y-6 lg:col-span-4">
             {/* 構成メトリクス + PDF CTA */}
-            <div className="glass-panel border-t-amber-gold rounded-xl border-t-2 p-4 sm:p-6 lg:sticky lg:top-[calc(5rem+env(safe-area-inset-top,0px)+0.5rem)]">
+            <div className="glass-panel rounded-xl p-4 sm:p-6">
               <h3 className="text-label-caps text-on-surface-variant mb-6 flex items-center gap-2 font-[family-name:var(--font-label-caps)]">
                 <span
                   className="material-symbols-outlined text-sm"

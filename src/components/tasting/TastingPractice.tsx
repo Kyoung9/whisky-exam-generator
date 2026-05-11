@@ -11,6 +11,8 @@ import {
   QUESTION_TYPE_LABELS,
   type ExamYear,
 } from "@/types/question";
+import { AppHeader } from "@/components/whisky-quest/AppHeader";
+import { BottomNav } from "@/components/whisky-quest/BottomNav";
 
 type Phase = "setup" | "quiz" | "summary";
 
@@ -191,24 +193,31 @@ export function TastingPractice() {
         />
       </div>
 
-      <header className="bg-glass-fill border-glass-stroke fixed top-0 left-0 z-50 w-full border-b pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
-        <div className="mx-auto flex h-20 w-full max-w-[1280px] items-center justify-between gap-3 px-4 sm:px-6 md:px-16">
-          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
-            <Link
-              href="/"
-              className="text-headline-lg text-amber-gold shrink-0 tracking-tight font-[family-name:var(--font-headline-lg)]"
-            >
-              WhiskyQuest
-            </Link>
-            <div className="bg-glass-stroke hidden h-6 w-px shrink-0 sm:block" />
-            <span className="text-label-caps text-on-surface-variant hidden truncate font-[family-name:var(--font-label-caps)] sm:inline">
-              第04章：テイスティング演習
-            </span>
-          </div>
-          {phase === "quiz" ? (
+      {/* setup / summary では他ページと同じ AppHeader を使い、UI を統一する。
+       * quiz 中だけ「集中モード」用の独自ヘッダー（章ラベル + タイマー + 閉じる）に切り替える。 */}
+      {phase !== "quiz" ? (
+        <AppHeader active="taste" />
+      ) : (
+        <header className="bg-glass-fill border-glass-stroke fixed top-0 left-0 z-50 w-full border-b pt-[env(safe-area-inset-top,0px)] backdrop-blur-md">
+          <div className="mx-auto flex h-20 w-full max-w-[1280px] items-center justify-between gap-3 px-4 sm:px-6 md:px-16">
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-4">
+              <Link
+                href="/"
+                className="text-headline-lg text-amber-gold shrink-0 tracking-tight font-[family-name:var(--font-headline-lg)]"
+              >
+                WhiskyQuest
+              </Link>
+              <div className="bg-glass-stroke hidden h-6 w-px shrink-0 sm:block" />
+              <span className="text-label-caps text-on-surface-variant hidden truncate font-[family-name:var(--font-label-caps)] sm:inline">
+                模擬試験 進行中
+              </span>
+            </div>
             <div className="flex shrink-0 items-center gap-4 sm:gap-6">
               <div className="text-label-caps text-amber-gold flex items-center gap-2 font-[family-name:var(--font-label-caps)]">
-                <span className="material-symbols-outlined text-[20px]" aria-hidden="true">
+                <span
+                  className="material-symbols-outlined text-[20px]"
+                  aria-hidden="true"
+                >
                   timer
                 </span>
                 <span className="tabular-nums">{formatElapsed(elapsed)}</span>
@@ -220,7 +229,7 @@ export function TastingPractice() {
                   if (
                     deck.length > 0 &&
                     !window.confirm(
-                      "テイスティングを終了してセラーに戻りますか？",
+                      "模擬試験を終了してダッシュボードに戻りますか？",
                     )
                   ) {
                     e.preventDefault();
@@ -231,17 +240,9 @@ export function TastingPractice() {
                 <span className="material-symbols-outlined">close</span>
               </Link>
             </div>
-          ) : (
-            <Link
-              href="/cellar"
-              aria-label="閉じる"
-              className="text-on-surface-variant hover:text-amber-gold flex min-h-11 min-w-11 items-center justify-center transition-colors"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </Link>
-          )}
-        </div>
-      </header>
+          </div>
+        </header>
+      )}
 
       {phase === "quiz" && (
         <div
@@ -263,7 +264,7 @@ export function TastingPractice() {
         className={`mx-auto flex w-full max-w-[1280px] flex-grow flex-col px-4 sm:px-6 md:px-16 ${
           phase === "quiz"
             ? "pb-[calc(7rem+env(safe-area-inset-bottom,0px))] pt-[calc(5rem+1px+2rem+env(safe-area-inset-top,0px))] md:pt-[calc(5rem+1px+3rem+env(safe-area-inset-top,0px))]"
-            : "pb-[calc(4rem+env(safe-area-inset-bottom,0px))] pt-[calc(5rem+2rem+env(safe-area-inset-top,0px))]"
+            : "pb-with-bottom-nav pt-[calc(5rem+2rem+env(safe-area-inset-top,0px))]"
         }`}
       >
         {phase === "setup" && (
@@ -757,6 +758,9 @@ export function TastingPractice() {
           </div>
         </aside>
       )}
+
+      {/* setup / summary は他ページと統一して BottomNav を表示 (md 未満のみ可視) */}
+      {phase !== "quiz" && <BottomNav active="taste" />}
 
       {phase === "quiz" && (
         <footer className="bg-background-deep border-glass-stroke fixed bottom-0 left-0 z-50 w-full border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom,0px))] sm:px-6">

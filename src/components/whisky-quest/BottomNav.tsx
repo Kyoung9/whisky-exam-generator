@@ -20,14 +20,20 @@ type NavTab = {
   href?: string;
 };
 
+// 直感ラベル: メタファ (蒸留 / セラー / テイスティング / アーカイブ) を機能名に変更
 const NAV_TABS: NavTab[] = [
-  { key: "cellar", icon: "inventory_2", label: "セラー", href: "/cellar" },
-  { key: "distill", icon: "science", label: "蒸留", href: "/generate" },
-  { key: "taste", icon: "wine_bar", label: "テイスティング", href: "/tasting" },
+  {
+    key: "cellar",
+    icon: "inventory_2",
+    label: "ダッシュボード",
+    href: "/cellar",
+  },
+  { key: "distill", icon: "science", label: "問題生成", href: "/generate" },
+  { key: "taste", icon: "wine_bar", label: "模擬試験", href: "/tasting" },
   {
     key: "archive",
     icon: "auto_stories",
-    label: "アーカイブ",
+    label: "過去問",
     href: "/archive",
   },
   {
