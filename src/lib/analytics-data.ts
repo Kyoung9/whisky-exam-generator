@@ -19,6 +19,14 @@ export type TypeStat = {
   accuracy: number;
 };
 
+export type CategoryTypeCell = {
+  category: string;
+  type: string;
+  attempts: number;
+  correct: number;
+  accuracy: number;
+};
+
 export type DayStat = {
   date: string; // YYYY-MM-DD
   attempts: number;
@@ -39,6 +47,7 @@ export type AnalyticsSnapshot = {
   savedSetCount: number;
   categoryStats: CategoryStat[]; // 全カテゴリ (multi 件)
   typeStats: TypeStat[];
+  categoryTypeStats: CategoryTypeCell[]; // カテゴリ × 出題タイプの交差（ヒートマップ用）
   dailyStats: DayStat[]; // 直近 30 日 (空の日も含む)
   recent: { correctRate: number; sampleSize: number }; // 直近 20 件の正答率
 };
@@ -57,6 +66,7 @@ const EMPTY: AnalyticsSnapshot = {
   savedSetCount: 0,
   categoryStats: [],
   typeStats: [],
+  categoryTypeStats: [],
   dailyStats: [],
   recent: { correctRate: 0, sampleSize: 0 },
 };
@@ -154,6 +164,7 @@ export async function loadAnalytics(): Promise<AnalyticsSnapshot> {
     daysRes,
     weakRes,
     typeRes,
+    categoryTypeRes,
     notesAllRes,
     notesUnresolvedRes,
     setsRes,
@@ -189,6 +200,10 @@ export async function loadAnalytics(): Promise<AnalyticsSnapshot> {
     supabase
       .from("practice_attempts")
       .select("question_type, correct"),
+    // カテゴリ × タイプ交差: ヒートマップ用に生データを集計
+    supabase
+      .from("practice_attempts")
+      .select("category, question_type, correct"),
     supabase
       .from("wrong_answer_notes")
       .select("id", { count: "exact", head: true }),
@@ -264,6 +279,34 @@ export async function loadAnalytics(): Promise<AnalyticsSnapshot> {
     }))
     .sort((a, b) => b.attempts - a.attempts);
 
+  // カテゴリ × タイプ (ヒートマップ用)
+  const rawCategoryType = categoryTypeRes.data ?? [];
+  const cellMap = new Map<
+    string,
+    { category: string; type: string; attempts: number; correct: number }
+  >();
+  for (const row of rawCategoryType) {
+    const category = (row.category ?? "unknown").trim() || "unknown";
+    const type = (row.question_type ?? "unknown").trim() || "unknown";
+    const key = `${category}|||${type}`;
+    const cur = cellMap.get(key) ?? { category, type, attempts: 0, correct: 0 };
+    // 上書きのために mutable copy
+    const next = {
+      ...cur,
+      attempts: cur.attempts + 1,
+      correct: cur.correct + (row.correct ? 1 : 0),
+    };
+    cellMap.set(key, next);
+  }
+
+  const categoryTypeStats: CategoryTypeCell[] = [...cellMap.values()].map((v) => ({
+    category: v.category,
+    type: v.type,
+    attempts: v.attempts,
+    correct: v.correct,
+    accuracy: v.attempts > 0 ? v.correct / v.attempts : 0,
+  }));
+
   // 直近 20 件正答率
   const recentRows = recentRes.data ?? [];
   const recentCorrect = recentRows.filter((r) => r.correct).length;
@@ -288,6 +331,7 @@ export async function loadAnalytics(): Promise<AnalyticsSnapshot> {
     savedSetCount: setsRes.count ?? 0,
     categoryStats,
     typeStats,
+    categoryTypeStats,
     dailyStats,
     recent,
   };

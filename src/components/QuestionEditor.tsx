@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { PastExamAnchorDialog } from "@/components/PastExamAnchorDialog";
 import {
   CATEGORIES,
   DIFFICULTIES,
@@ -30,6 +31,7 @@ export function QuestionEditor({ question, onSave, onCancel }: Props) {
   const [explanation, setExplanation] = useState<string>(
     question.explanation ?? "",
   );
+  const [pastAnchorOpen, setPastAnchorOpen] = useState(false);
 
   function updateChoice(i: number, value: string) {
     setChoices((prev) => prev.map((c, idx) => (idx === i ? value : c)));
@@ -59,7 +61,7 @@ export function QuestionEditor({ question, onSave, onCancel }: Props) {
 
   return (
     <article className="glass-card border-amber-gold rounded-xl border p-5 ring-1 ring-amber-gold/40">
-      <header className="mb-5 flex items-center gap-2">
+      <header className="mb-5 flex flex-wrap items-center gap-2">
         <span
           className="material-symbols-outlined text-amber-gold"
           aria-hidden="true"
@@ -69,6 +71,21 @@ export function QuestionEditor({ question, onSave, onCancel }: Props) {
         <h3 className="text-title-md text-amber-gold font-[family-name:var(--font-title-md)]">
           問題を編集
         </h3>
+        {question.pastMapAnchorId && (
+          <button
+            type="button"
+            onClick={() => setPastAnchorOpen(true)}
+            className="amber-cta-outline ml-auto"
+          >
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              history_edu
+            </span>
+            参照過去問
+          </button>
+        )}
       </header>
 
       <div className="space-y-5">
@@ -265,6 +282,13 @@ export function QuestionEditor({ question, onSave, onCancel }: Props) {
           </button>
         </div>
       </div>
+
+      {pastAnchorOpen && question.pastMapAnchorId && (
+        <PastExamAnchorDialog
+          pastExamId={question.pastMapAnchorId}
+          onClose={() => setPastAnchorOpen(false)}
+        />
+      )}
     </article>
   );
 }

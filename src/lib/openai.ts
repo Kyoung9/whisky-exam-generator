@@ -52,7 +52,7 @@ async function callOpenAIJsonChat(params: {
   }
 }
 
-// OpenAI を優先し、失敗時またはキー未設定時は Gemini にフォールバック
+// Gemini を優先し、失敗時またはキー未設定時は OpenAI にフォールバック
 export async function callJsonChat(params: {
   system: string;
   user: string;
@@ -60,35 +60,38 @@ export async function callJsonChat(params: {
   const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
   const hasGemini = Boolean(process.env.GEMINI_API_KEY);
 
-  let openAIError: Error | undefined;
-
-  if (hasOpenAI) {
-    try {
-      return await callOpenAIJsonChat(params);
-    } catch (e) {
-      openAIError = e instanceof Error ? e : new Error(String(e));
-      if (process.env.NODE_ENV === "development") {
-        console.warn("[callJsonChat] OpenAI failed, fallback:", openAIError.message);
-      }
-    }
-  }
+  let geminiError: Error | undefined;
 
   if (hasGemini) {
     try {
       return await callGeminiJsonChat(params);
     } catch (e) {
-      const geminiError = e instanceof Error ? e : new Error(String(e));
-      if (openAIError) {
-        throw new Error(
-          `OpenAI failed (${openAIError.message}); Gemini failed (${geminiError.message})`
+      geminiError = e instanceof Error ? e : new Error(String(e));
+      if (process.env.NODE_ENV === "development") {
+        console.warn(
+          "[callJsonChat] Gemini failed, fallback:",
+          geminiError.message,
         );
       }
-      throw geminiError;
     }
   }
 
-  if (openAIError) {
-    throw openAIError;
+  if (hasOpenAI) {
+    try {
+      return await callOpenAIJsonChat(params);
+    } catch (e) {
+      const openAIError = e instanceof Error ? e : new Error(String(e));
+      if (geminiError) {
+        throw new Error(
+          `Gemini failed (${geminiError.message}); OpenAI failed (${openAIError.message})`
+        );
+      }
+      throw openAIError;
+    }
+  }
+
+  if (geminiError) {
+    throw geminiError;
   }
 
   throw new Error("Neither OPENAI_API_KEY nor GEMINI_API_KEY is set");

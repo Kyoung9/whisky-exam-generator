@@ -37,11 +37,15 @@ type Props = {
 };
 
 // PDF プレビュー + ダウンロード — ポータルで body 直下に載せフルビューポート相当に
+const PREVIEW_ZOOM_OPTIONS = [0.75, 0.9, 1, 1.25, 1.5] as const;
+
 export function PdfPreviewModal({ questions, onClose }: Props) {
   const [title, setTitle] = useState("ウイスキーエキスパート 予想問題集");
   const [includeAnswer, setIncludeAnswer] = useState(true);
   const [includeExplanation, setIncludeExplanation] = useState(true);
   const [onlySelected, setOnlySelected] = useState(true);
+  /** iframe 内 PDF の見た目倍率（CSS zoom、ブラウザ依存あり） */
+  const [previewZoom, setPreviewZoom] = useState<number>(1);
 
   const filtered = onlySelected
     ? questions.filter((q) => q.selected)
@@ -56,12 +60,12 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
 
   const modal = (
     <div
-      className="bg-background-deep/80 fixed inset-0 z-[100] flex flex-col items-stretch p-0 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-3"
+      className="bg-background-deep/80 fixed inset-0 z-[100] flex flex-col items-center justify-center p-2 pt-[max(0.5rem,env(safe-area-inset-top,0px))] pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] backdrop-blur-sm sm:p-4"
       role="dialog"
       aria-modal
       aria-labelledby="pdf-preview-title"
     >
-      <div className="glass-panel flex h-[100dvh] max-h-[100dvh] w-full min-h-0 flex-1 flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(95dvh,calc(100dvh-1.5rem))] sm:w-full sm:max-w-[min(96rem,calc(100vw-1.5rem))] sm:flex-initial sm:rounded-xl">
+      <div className="glass-panel flex h-[min(100dvh,calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom)))] w-full max-w-[min(56rem,calc(100vw-1rem))] min-h-0 flex-col overflow-hidden rounded-xl sm:max-h-[min(98dvh,calc(100dvh-2rem))]">
         <header className="border-glass-stroke flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-6 sm:py-4">
           <h3
             id="pdf-preview-title"
@@ -90,8 +94,8 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(220px,1fr)] overflow-hidden lg:grid-cols-[minmax(240px,300px)_1fr] lg:grid-rows-1">
-          <aside className="border-glass-stroke max-h-[38dvh] space-y-4 overflow-y-auto border-b p-4 sm:space-y-5 sm:p-5 lg:max-h-none lg:border-r lg:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_1fr] overflow-hidden lg:grid-cols-[minmax(220px,280px)_1fr] lg:grid-rows-1">
+          <aside className="border-glass-stroke max-h-[min(40dvh,320px)] shrink-0 space-y-4 overflow-y-auto border-b p-4 sm:space-y-5 sm:p-5 lg:max-h-none lg:border-r lg:border-b-0">
             <label className="block space-y-2">
               <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
                 PDF タイトル
@@ -104,29 +108,29 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
             </label>
 
             <div className="space-y-3">
-              <label className="text-body-lg flex items-center gap-3 font-[family-name:var(--font-body-lg)]">
+              <label className="wq-checkbox-row wq-checkbox-row--compact text-body-lg font-[family-name:var(--font-body-lg)]">
                 <input
                   type="checkbox"
                   checked={includeAnswer}
                   onChange={(e) => setIncludeAnswer(e.target.checked)}
                 />
-                正解を含める
+                <span>正解を含める</span>
               </label>
-              <label className="text-body-lg flex items-center gap-3 font-[family-name:var(--font-body-lg)]">
+              <label className="wq-checkbox-row wq-checkbox-row--compact text-body-lg font-[family-name:var(--font-body-lg)]">
                 <input
                   type="checkbox"
                   checked={includeExplanation}
                   onChange={(e) => setIncludeExplanation(e.target.checked)}
                 />
-                解説を含める
+                <span>解説を含める</span>
               </label>
-              <label className="text-body-lg flex items-center gap-3 font-[family-name:var(--font-body-lg)]">
+              <label className="wq-checkbox-row wq-checkbox-row--compact text-body-lg font-[family-name:var(--font-body-lg)]">
                 <input
                   type="checkbox"
                   checked={onlySelected}
                   onChange={(e) => setOnlySelected(e.target.checked)}
                 />
-                選択した問題のみ出力
+                <span>選択した問題のみ出力</span>
               </label>
             </div>
 
@@ -174,17 +178,48 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
             )}
           </aside>
 
-          <div className="bg-surface-container-low/60 min-h-[220px] flex-1 overflow-hidden lg:min-h-0">
+          <div className="bg-surface-container-low/60 flex min-h-0 flex-1 flex-col overflow-hidden">
             {filtered.length > 0 ? (
-              <PDFViewer
-                key={`${title}|${includeAnswer}|${includeExplanation}|${onlySelected}|${filtered.length}`}
-                style={{ width: "100%", height: "100%", border: "none" }}
-                showToolbar={false}
-              >
-                <QuestionPdf questions={filtered} options={options} />
-              </PDFViewer>
+              <>
+                <div className="border-glass-stroke flex shrink-0 flex-wrap items-center gap-3 border-b px-3 py-2 sm:px-4">
+                  <label className="text-label-caps text-on-surface-variant flex items-center gap-2 font-[family-name:var(--font-label-caps)]">
+                    表示倍率
+                    <select
+                      value={previewZoom}
+                      onChange={(e) =>
+                        setPreviewZoom(Number(e.target.value) || 1)
+                      }
+                      className="dark-field text-body-sm rounded px-2 py-1 font-[family-name:var(--font-body-sm)]"
+                    >
+                      {PREVIEW_ZOOM_OPTIONS.map((z) => (
+                        <option key={z} value={z} className="bg-surface-charcoal">
+                          {Math.round(z * 100)}%
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <span className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+                    プレビューのみ（ダウンロード PDF は常に 100%）
+                  </span>
+                </div>
+                <div
+                  className="min-h-0 flex-1 overflow-auto"
+                  style={{
+                    zoom: previewZoom,
+                  }}
+                >
+                  <PDFViewer
+                    key={`${title}|${includeAnswer}|${includeExplanation}|${onlySelected}|${filtered.length}`}
+                    className="block min-h-[70dvh] w-full sm:min-h-[75dvh]"
+                    style={{ width: "100%", height: "100%", minHeight: "70dvh", border: "none" }}
+                    showToolbar={false}
+                  >
+                    <QuestionPdf questions={filtered} options={options} />
+                  </PDFViewer>
+                </div>
+              </>
             ) : (
-              <div className="text-body-sm text-on-surface-variant flex h-full items-center justify-center p-6 font-[family-name:var(--font-body-sm)]">
+              <div className="text-body-sm text-on-surface-variant flex h-full min-h-[200px] items-center justify-center p-6 font-[family-name:var(--font-body-sm)]">
                 出力する問題がありません。
               </div>
             )}

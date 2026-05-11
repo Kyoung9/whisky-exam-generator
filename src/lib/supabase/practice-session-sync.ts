@@ -19,6 +19,8 @@ export async function persistPracticeSessionToSupabase(params: {
   mode: PracticeSourceMode;
   years: ExamYear[];
   elapsedSec: number;
+  /** saved_set 演習時の saved_question_sets.id */
+  sourceSetId?: string | null;
 }): Promise<void> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -52,6 +54,7 @@ export async function persistPracticeSessionToSupabase(params: {
     user_answer: Json | null;
     resolved: boolean;
     external_question_key: string | null;
+    source_set_id: string | null;
   }[] = [];
 
   for (let i = 0; i < params.deck.length; i++) {
@@ -73,6 +76,7 @@ export async function persistPracticeSessionToSupabase(params: {
         years: params.years,
         position: i,
         elapsed_sec: params.elapsedSec,
+        source_set_id: params.sourceSetId ?? null,
       },
     });
 
@@ -90,6 +94,7 @@ export async function persistPracticeSessionToSupabase(params: {
         user_answer: log.submitted,
         resolved: false,
         external_question_key: q.id,
+        source_set_id: params.sourceSetId ?? null,
       });
     }
   }

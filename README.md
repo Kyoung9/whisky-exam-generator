@@ -686,7 +686,7 @@ public/
 ```bash
 cp .env.local.example .env.local
 # .env.local 에서 OPENAI_API_KEY 와/또는 GEMINI_API_KEY 를 설정한다
-# 문제 생성 API 는 OpenAI 를 우선 사용하고, 실패하거나 키가 없으면 Gemini 로 폴백한다
+# 문제 생성 API 는 Gemini 를 우선 사용하고, 실패하거나 키가 없으면 OpenAI 로 폴백한다
 # 텍스트 모델: 기본 gpt-5-mini (OPENAI_MODEL), Gemini 는 기본 gemini-2.0-flash (GEMINI_MODEL)
 ```
 

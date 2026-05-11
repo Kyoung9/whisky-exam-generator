@@ -53,6 +53,9 @@ export function SimilarQuestionDialog({
             ...(source.imageDescription
               ? { imageDescription: source.imageDescription }
               : {}),
+            ...(source.pastMapAnchorId
+              ? { pastMapAnchorId: source.pastMapAnchorId }
+              : {}),
           },
           count,
           mode,
@@ -70,6 +73,7 @@ export function SimilarQuestionDialog({
       const tagged = data.questions.map((q) => ({
         ...q,
         sourceQuestionId: source.id,
+        sourcePastExamIds: source.sourcePastExamIds,
       }));
       onGenerated(tagged);
       onClose();

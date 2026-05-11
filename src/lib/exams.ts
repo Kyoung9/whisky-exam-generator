@@ -1,4 +1,10 @@
-import type { Category, ExamYear, PastExamQuestion, QuestionType } from "@/types/question";
+import {
+  EXAM_YEARS,
+  type Category,
+  type ExamYear,
+  type PastExamQuestion,
+  type QuestionType,
+} from "@/types/question";
 
 import we2021 from "@/data/exams/we-2021.json";
 import we2022 from "@/data/exams/we-2022.json";
@@ -27,6 +33,15 @@ function asPastExamQuestions(raw: unknown): PastExamQuestion[] {
 
 export function getQuestionsByYear(year: ExamYear): PastExamQuestion[] {
   return asPastExamQuestions(RAW[year]);
+}
+
+/** 過去問 JSON の id で検索（クライアント・サーバー両方で利用可） */
+export function getPastExamQuestionById(id: string): PastExamQuestion | undefined {
+  for (const year of EXAM_YEARS) {
+    const found = getQuestionsByYear(year).find((q) => q.id === id);
+    if (found) return found;
+  }
+  return undefined;
 }
 
 // 指定された年の問題を全て集めて、カテゴリ/種別で絞り込む。

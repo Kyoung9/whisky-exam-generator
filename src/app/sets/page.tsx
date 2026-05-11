@@ -2,10 +2,11 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { AppHeader } from "@/components/whisky-quest/AppHeader";
 import { BottomNav } from "@/components/whisky-quest/BottomNav";
 import { loadExamSets } from "@/lib/exam-set-storage";
+import { fetchPublicSavedSets } from "@/lib/supabase/saved-sets-client";
 import { useUser } from "@/lib/supabase/use-user";
 import { useExamSets } from "@/lib/use-exam-sets";
 import type { ExamSet } from "@/types/exam-set";
@@ -33,11 +34,12 @@ const SORT_LABELS: Record<SortKey, string> = {
   size_desc: "問題数が多い順",
 };
 
+/** SSR とクライアントで一致させるため UTC 日付のみ使用 */
 function formatDate(ms: number): string {
   const d = new Date(ms);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
+  const y = d.getUTCFullYear();
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(d.getUTCDate()).padStart(2, "0");
   return `${y}.${m}.${day}`;
 }
 
@@ -55,20 +57,72 @@ function tier(count: number): string {
   return "Foundation";
 }
 
+type ListTab = "mine" | "community";
+
 export default function SetsPage() {
   const { user, loading: userLoading } = useUser();
   const { sets, hydrated, removeSet, migrateLocalSetsToCloud } = useExamSets();
+  const [listTab, setListTab] = useState<ListTab>("mine");
+  const [communitySets, setCommunitySets] = useState<ExamSet[]>([]);
+  const [communityLoading, setCommunityLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("newest");
   const [sortOpen, setSortOpen] = useState(false);
   const [previewSet, setPreviewSet] = useState<ExamSet | null>(null);
   const [migrating, setMigrating] = useState(false);
   const [migrateBanner, setMigrateBanner] = useState<string | null>(null);
+  /** localStorage はマウント後のみ読む（SSR と初回クライアントで一致させる） */
+  const [localSetsCount, setLocalSetsCount] = useState(0);
 
-  const localSetsCount =
-    !userLoading && user && typeof window !== "undefined"
-      ? loadExamSets().length
-      : 0;
+  useEffect(() => {
+    if (userLoading || !user) {
+      setLocalSetsCount(0);
+      return;
+    }
+    setLocalSetsCount(loadExamSets().length);
+  }, [user, userLoading]);
+
+  useEffect(() => {
+    if (listTab !== "community" || !user) return;
+    let cancelled = false;
+    setCommunityLoading(true);
+    void fetchPublicSavedSets({
+      excludeOwn: true,
+      q: query.trim() || undefined,
+      limit: 60,
+    })
+      .then((data) => {
+        if (!cancelled) setCommunitySets(data);
+      })
+      .finally(() => {
+        if (!cancelled) setCommunityLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [listTab, user, query]);
+
+  const sortSets = useCallback((list: ExamSet[]) => {
+    const sorted = [...list];
+    switch (sortKey) {
+      case "newest":
+        sorted.sort(
+          (a, b) =>
+            (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt),
+        );
+        break;
+      case "oldest":
+        sorted.sort(
+          (a, b) =>
+            (a.updatedAt ?? a.createdAt) - (b.updatedAt ?? b.createdAt),
+        );
+        break;
+      case "size_desc":
+        sorted.sort((a, b) => b.questions.length - a.questions.length);
+        break;
+    }
+    return sorted;
+  }, [sortKey]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -80,20 +134,19 @@ export default function SetsPage() {
             (s.categoryHints ?? []).some((c) => c.toLowerCase().includes(q)),
         )
       : sets;
-    const sorted = [...filtered];
-    switch (sortKey) {
-      case "newest":
-        sorted.sort((a, b) => b.createdAt - a.createdAt);
-        break;
-      case "oldest":
-        sorted.sort((a, b) => a.createdAt - b.createdAt);
-        break;
-      case "size_desc":
-        sorted.sort((a, b) => b.questions.length - a.questions.length);
-        break;
-    }
-    return sorted;
-  }, [sets, query, sortKey]);
+    return sortSets(filtered);
+  }, [sets, query, sortSets]);
+
+  const visibleCommunity = useMemo(
+    () => sortSets(communitySets),
+    [communitySets, sortSets],
+  );
+
+  const activeList = listTab === "mine" ? visible : visibleCommunity;
+  const activeLoading =
+    listTab === "mine" ? !hydrated : user ? communityLoading : false;
+  const activeEmpty =
+    listTab === "mine" ? sets.length === 0 : communitySets.length === 0;
 
   return (
     <div className="bg-background-deep text-on-surface min-h-dvh pb-with-bottom-nav">
@@ -130,7 +183,7 @@ export default function SetsPage() {
           </Link>
         </section>
 
-        {hydrated && user && localSetsCount > 0 && (
+        {listTab === "mine" && hydrated && user && localSetsCount > 0 && (
           <div className="border-amber-gold/30 bg-amber-gold/5 mb-8 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-body-sm text-on-surface font-[family-name:var(--font-body-sm)]">
               このブラウザに保存されたローカルセットが{" "}
@@ -162,7 +215,7 @@ export default function SetsPage() {
             </button>
           </div>
         )}
-        {migrateBanner && (
+        {migrateBanner && listTab === "mine" && (
           <p
             role="status"
             className="text-body-sm text-amber-gold mb-6 font-[family-name:var(--font-body-sm)]"
@@ -170,6 +223,39 @@ export default function SetsPage() {
             {migrateBanner}
           </p>
         )}
+
+        <div
+          role="tablist"
+          aria-label="セット一覧の種類"
+          className="mb-6 flex flex-wrap gap-2"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={listTab === "mine"}
+            onClick={() => setListTab("mine")}
+            className={`text-label-caps rounded-lg px-4 py-2 font-[family-name:var(--font-label-caps)] transition-colors ${
+              listTab === "mine"
+                ? "bg-amber-gold text-cask-brown"
+                : "border-glass-stroke text-on-surface-variant hover:border-amber-gold/50 border"
+            }`}
+          >
+            マイセット
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={listTab === "community"}
+            onClick={() => setListTab("community")}
+            className={`text-label-caps rounded-lg px-4 py-2 font-[family-name:var(--font-label-caps)] transition-colors ${
+              listTab === "community"
+                ? "bg-amber-gold text-cask-brown"
+                : "border-glass-stroke text-on-surface-variant hover:border-amber-gold/50 border"
+            }`}
+          >
+            コミュニティ
+          </button>
+        </div>
 
         {/* 検索 + ソート */}
         <div className="border-glass-stroke mb-8 flex flex-wrap items-center justify-between gap-4 border-b pb-6">
@@ -184,7 +270,11 @@ export default function SetsPage() {
               type="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="問題セットを検索..."
+              placeholder={
+                listTab === "community"
+                  ? "公開セットのタイトルで検索…"
+                  : "問題セットを検索…"
+              }
               aria-label="問題セットを検索"
               className="text-label-caps placeholder:text-on-surface-variant/40 focus:border-amber-gold border-glass-stroke w-full border-0 border-b bg-transparent py-3 pr-3 pl-12 font-[family-name:var(--font-label-caps)] outline-none ring-0 transition-colors"
             />
@@ -236,64 +326,100 @@ export default function SetsPage() {
         </div>
 
         {/* グリッド */}
-        {!hydrated ? (
+        {listTab === "community" && !userLoading && !user && (
+          <div className="border-glass-stroke rounded-xl border border-dashed bg-white/[0.02] p-10 text-center">
+            <p className="text-body-lg text-on-surface font-[family-name:var(--font-body-lg)]">
+              コミュニティの公開セットを閲覧するにはログインが必要です。
+            </p>
+            <Link href="/login" className="amber-cta mt-6 inline-flex">
+              ログインへ
+            </Link>
+          </div>
+        )}
+
+        {listTab === "community" && user && activeLoading && (
           <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
             読込中…
           </p>
-        ) : sets.length === 0 ? (
-          <EmptyState />
-        ) : (
+        )}
+
+        {listTab === "mine" && !hydrated && (
+          <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+            読込中…
+          </p>
+        )}
+
+        {listTab === "mine" && hydrated && sets.length === 0 && <EmptyState />}
+
+        {listTab === "community" && user && !activeLoading && activeEmpty && (
+          <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+            表示できる公開セットがありません。検索条件を変えるか、あとでもう一度お試しください。
+          </p>
+        )}
+
+        {((listTab === "mine" && hydrated && sets.length > 0) ||
+          (listTab === "community" && user && !activeLoading && !activeEmpty)) && (
           <ul className="grid list-none grid-cols-1 gap-6 p-0 md:grid-cols-2 lg:grid-cols-3">
-            {visible.map((set) => (
+            {activeList.map((set) => (
               <li key={set.id}>
                 <ExamSetCard
+                  variant={listTab === "community" ? "community" : "mine"}
                   set={set}
+                  editHref={`/generate?editSet=${encodeURIComponent(set.id)}`}
                   onPreview={() => setPreviewSet(set)}
-                  onDelete={() => {
-                    if (
-                      window.confirm(
-                        `「${set.name}」を削除しますか？この操作は取り消せません。`,
-                      )
-                    ) {
-                      removeSet(set.id);
-                    }
-                  }}
+                  onDelete={
+                    listTab === "mine"
+                      ? () => {
+                          if (
+                            window.confirm(
+                              `「${set.name}」を削除しますか？この操作は取り消せません。`,
+                            )
+                          ) {
+                            removeSet(set.id);
+                          }
+                        }
+                      : undefined
+                  }
                 />
               </li>
             ))}
-            {/* 末尾の Empty / Create New カード */}
-            <li>
-              <Link
-                href="/generate"
-                className="border-glass-stroke hover:border-amber-gold/40 group flex h-full min-h-[280px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-white/[0.02] p-8 text-center transition-all"
-              >
-                <div className="bg-surface-container mb-4 flex h-16 w-16 items-center justify-center rounded-full transition-transform group-hover:scale-110">
-                  <span
-                    className="material-symbols-outlined text-amber-gold text-3xl"
-                    aria-hidden="true"
-                  >
-                    add
-                  </span>
-                </div>
-                <h4 className="text-title-md text-on-surface font-[family-name:var(--font-title-md)]">
-                  新しい問題セットを作成
-                </h4>
-                <p className="text-body-sm text-on-surface-variant mt-2 font-[family-name:var(--font-body-sm)]">
-                  ジェネレーターで問題を作り、保存します
-                </p>
-              </Link>
-            </li>
+            {listTab === "mine" && (
+              <li>
+                <Link
+                  href="/generate"
+                  className="border-glass-stroke hover:border-amber-gold/40 group flex h-full min-h-[280px] cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed bg-white/[0.02] p-8 text-center transition-all"
+                >
+                  <div className="bg-surface-container mb-4 flex h-16 w-16 items-center justify-center rounded-full transition-transform group-hover:scale-110">
+                    <span
+                      className="material-symbols-outlined text-amber-gold text-3xl"
+                      aria-hidden="true"
+                    >
+                      add
+                    </span>
+                  </div>
+                  <h4 className="text-title-md text-on-surface font-[family-name:var(--font-title-md)]">
+                    新しい問題セットを作成
+                  </h4>
+                  <p className="text-body-sm text-on-surface-variant mt-2 font-[family-name:var(--font-body-sm)]">
+                    ジェネレーターで問題を作り、保存します
+                  </p>
+                </Link>
+              </li>
+            )}
           </ul>
         )}
 
-        {visible.length === 0 && hydrated && sets.length > 0 && (
-          <p
-            className="text-body-sm text-on-surface-variant mt-6 text-center font-[family-name:var(--font-body-sm)]"
-            role="status"
-          >
-            検索条件に一致するセットがありません。
-          </p>
-        )}
+        {listTab === "mine" &&
+          visible.length === 0 &&
+          hydrated &&
+          sets.length > 0 && (
+            <p
+              className="text-body-sm text-on-surface-variant mt-6 text-center font-[family-name:var(--font-body-sm)]"
+              role="status"
+            >
+              検索条件に一致するセットがありません。
+            </p>
+          )}
       </main>
 
       <BottomNav active="distill" />
@@ -309,12 +435,20 @@ export default function SetsPage() {
 }
 
 type CardProps = {
+  variant?: "mine" | "community";
   set: ExamSet;
+  editHref: string;
   onPreview: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
 };
 
-function ExamSetCard({ set, onPreview, onDelete }: CardProps) {
+function ExamSetCard({
+  variant = "mine",
+  set,
+  editHref,
+  onPreview,
+  onDelete,
+}: CardProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const hints = set.categoryHints ?? [];
 
@@ -347,19 +481,37 @@ function ExamSetCard({ set, onPreview, onDelete }: CardProps) {
             {menuOpen && (
               <div
                 role="menu"
-                className="glass-card absolute right-0 top-full z-20 mt-1 w-32 overflow-hidden rounded-lg border"
+                className="glass-card absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-lg border"
               >
-                <button
-                  type="button"
+                <Link
+                  href={editHref}
                   role="menuitem"
-                  onClick={() => {
-                    setMenuOpen(false);
-                    onDelete();
-                  }}
-                  className="text-body-sm text-error hover:bg-error/10 w-full px-3 py-2 text-left font-[family-name:var(--font-body-sm)]"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-body-sm text-on-surface hover:bg-white/5 block w-full px-3 py-2 font-[family-name:var(--font-body-sm)]"
                 >
-                  削除
-                </button>
+                  編集（ジェネレータ）
+                </Link>
+                <Link
+                  href={`/sets/${encodeURIComponent(set.id)}`}
+                  role="menuitem"
+                  onClick={() => setMenuOpen(false)}
+                  className="text-body-sm text-on-surface hover:bg-white/5 block w-full px-3 py-2 font-[family-name:var(--font-body-sm)]"
+                >
+                  詳細・演習
+                </Link>
+                {onDelete && (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onDelete();
+                    }}
+                    className="text-body-sm text-error hover:bg-error/10 w-full px-3 py-2 text-left font-[family-name:var(--font-body-sm)]"
+                  >
+                    削除
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -368,6 +520,16 @@ function ExamSetCard({ set, onPreview, onDelete }: CardProps) {
         <h3 className="text-headline-lg-mobile text-on-surface mb-2 break-words font-[family-name:var(--font-headline-lg)]">
           {set.name}
         </h3>
+        {variant === "community" &&
+          (set.authorDisplayName != null && set.authorDisplayName !== "" ? (
+            <p className="text-label-caps text-on-surface-variant mb-2 font-[family-name:var(--font-label-caps)]">
+              作成: {set.authorDisplayName}
+            </p>
+          ) : set.authorId ? (
+            <p className="text-label-caps text-on-surface-variant mb-2 font-[family-name:var(--font-label-caps)]">
+              作成: ユーザー
+            </p>
+          ) : null)}
         {set.memo && (
           <p className="text-body-sm text-on-surface-variant mb-6 font-[family-name:var(--font-body-sm)]">
             {set.memo}

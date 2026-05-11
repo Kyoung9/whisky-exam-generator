@@ -59,6 +59,7 @@ export async function POST(req: Request) {
     types: types as QuestionType[],
     limit: MAX_PAST_QUESTIONS_FOR_PROMPT,
   });
+  const pastExamIds = pastQuestions.map((q) => q.id);
 
   const { system, user } = buildGeneratePrompt({
     pastQuestions,
@@ -87,6 +88,8 @@ export async function POST(req: Request) {
   }
 
   const questions = toGeneratedQuestions(aiParsed.data, {
+    pastMapAnchorId: wantsMap && mapAnchor ? mapAnchor.id : undefined,
+    sourcePastExamIds: pastExamIds,
     mapImageFrom:
       wantsMap && mapAnchor?.imageRef
         ? {

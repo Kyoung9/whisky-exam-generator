@@ -87,6 +87,14 @@ export type GeneratedQuestion = {
   difficulty: Difficulty;
   selected: boolean;
   sourceQuestionId?: string;
+  /**
+   * AI が生成に「参照した過去問」集合（バッチ単位）。
+   * 現状は個別 1 問ごとの厳密な参照元までは追跡できないため、
+   * 生成リクエスト時に渡した過去問 id 群を保持する。
+   */
+  sourcePastExamIds?: string[];
+  /** 地図再利用生成時: 図版の元となった過去問の id（例 we-2021-001-a） */
+  pastMapAnchorId?: string;
   imageRef?: string;
   imageSourcePage?: number;
   imageDescription?: string;

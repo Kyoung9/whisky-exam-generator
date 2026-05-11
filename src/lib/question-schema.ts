@@ -65,6 +65,7 @@ export const similarRequestSchema = z.object({
     imageRef: z.string().optional(),
     imageSourcePage: z.number().int().optional(),
     imageDescription: z.string().optional(),
+    pastMapAnchorId: z.string().optional(),
   }),
   count: z.number().int().min(1).max(10),
   mode: z.enum(["similar", "same_theme", "same_difficulty", "same_type"]),
@@ -88,14 +89,20 @@ export function toGeneratedQuestions(
   ai: AiResponse,
   options?: {
     sourceQuestionId?: string;
+    /** バッチ単位: 生成の参考に渡した過去問 id 群 */
+    sourcePastExamIds?: string[];
     /** type=map のみ: 過去問の図版を流用する */
     mapImageFrom?: Pick<
       GeneratedQuestion,
       "imageRef" | "imageSourcePage" | "imageDescription"
     >;
+    /** map 図版再利用時の元過去問 id */
+    pastMapAnchorId?: string;
   }
 ): GeneratedQuestion[] {
   const img = options?.mapImageFrom;
+  const anchorId = options?.pastMapAnchorId;
+  const pastIds = options?.sourcePastExamIds;
   return ai.questions.map((q) => {
     const attachMapImage =
       q.type === "map" && img?.imageRef
@@ -107,6 +114,7 @@ export function toGeneratedQuestions(
             ...(img.imageDescription !== undefined
               ? { imageDescription: img.imageDescription }
               : {}),
+            ...(anchorId ? { pastMapAnchorId: anchorId } : {}),
           }
         : {};
     return {
@@ -121,6 +129,7 @@ export function toGeneratedQuestions(
       difficulty: q.difficulty as GeneratedQuestion["difficulty"],
       selected: true,
       sourceQuestionId: options?.sourceQuestionId,
+      ...(pastIds && pastIds.length > 0 ? { sourcePastExamIds: pastIds } : {}),
       ...attachMapImage,
     };
   });

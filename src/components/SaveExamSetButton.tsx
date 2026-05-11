@@ -6,12 +6,19 @@ import type { GeneratedQuestion } from "@/types/question";
 
 type Props = {
   questions: GeneratedQuestion[];
+  /** /generate?editSet= から開いたときの上書き先（本人セットのみ true） */
+  editTarget?: {
+    id: string;
+    name: string;
+    allowOverwrite: boolean;
+  } | null;
 };
 
 /*
  * 「現在の生成リストを名前付きセットとして保存」する CTA + モーダル。
  * - ログイン時: Supabase saved_question_sets へ insert（MY EXAMS / ダッシュボードと同期）
  * - 未ログイン時: localStorage（従来どおり）
+ * - editTarget かつ allowOverwrite: ワンクリックで updateSet（上書き）
  * - 保存後は inline で「保存しました」を 2.5 秒表示
  */
 
@@ -37,8 +44,8 @@ function topCategories(questions: GeneratedQuestion[]): string[] {
     .map(([k]) => k);
 }
 
-export function SaveExamSetButton({ questions }: Props) {
-  const { addSet, hydrated } = useExamSets();
+export function SaveExamSetButton({ questions, editTarget }: Props) {
+  const { addSet, updateSet, hydrated } = useExamSets();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
@@ -52,7 +59,24 @@ export function SaveExamSetButton({ questions }: Props) {
     return () => window.clearTimeout(id);
   }, [saved]);
 
-  async function handleConfirm() {
+  async function handleOverwrite() {
+    if (!editTarget?.allowOverwrite) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await updateSet(editTarget.id, {
+        name: editTarget.name,
+        questions: questions.map((q) => ({ ...q })),
+      });
+      setSaved(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleConfirmNew() {
     const trimmed = name.trim() || defaultName();
     setSaving(true);
     setSaveError(null);
@@ -73,20 +97,38 @@ export function SaveExamSetButton({ questions }: Props) {
 
   return (
     <>
+      {editTarget?.allowOverwrite && (
+        <button
+          type="button"
+          onClick={() => void handleOverwrite()}
+          disabled={disabled || saving}
+          className="bg-amber-gold text-cask-brown hover:brightness-110 mt-3 flex w-full items-center justify-center gap-2 rounded border border-transparent px-4 py-3 font-[family-name:var(--font-label-caps)] text-[12px] tracking-[0.08em] uppercase transition-colors disabled:opacity-40"
+        >
+          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+            save
+          </span>
+          「{editTarget.name}」を更新して保存
+        </button>
+      )}
+
       <button
         type="button"
         onClick={() => {
-          setName(defaultName());
+          setName(editTarget?.name?.trim() || defaultName());
           setSaveError(null);
           setOpen(true);
         }}
         disabled={disabled}
-        className="border-amber-gold text-amber-gold hover:bg-amber-gold/10 mt-3 flex w-full items-center justify-center gap-2 rounded border px-4 py-3 font-[family-name:var(--font-label-caps)] text-[12px] tracking-[0.08em] uppercase transition-colors disabled:opacity-40"
+        className={`border-amber-gold text-amber-gold hover:bg-amber-gold/10 mt-3 flex w-full items-center justify-center gap-2 rounded border px-4 py-3 font-[family-name:var(--font-label-caps)] text-[12px] tracking-[0.08em] uppercase transition-colors disabled:opacity-40 ${
+          editTarget?.allowOverwrite ? "" : ""
+        }`}
       >
         <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
           bookmark_add
         </span>
-        現在のセットを保存
+        {editTarget?.allowOverwrite
+          ? "別名で新しいセットとして保存…"
+          : "現在のセットを保存"}
       </button>
 
       {saved && (
@@ -114,7 +156,9 @@ export function SaveExamSetButton({ questions }: Props) {
               id="save-set-title"
               className="text-headline-lg-mobile text-amber-gold mb-2 font-[family-name:var(--font-headline-lg)]"
             >
-              セット名を付けて保存
+              {editTarget?.allowOverwrite
+                ? "新しい名前でセットを保存"
+                : "セット名を付けて保存"}
             </h3>
             <p className="text-body-sm text-on-surface-variant mb-4 font-[family-name:var(--font-body-sm)]">
               現在の {questions.length} 問のスナップショットを保存します。
@@ -130,7 +174,7 @@ export function SaveExamSetButton({ questions }: Props) {
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !saving) void handleConfirm();
+                  if (e.key === "Enter" && !saving) void handleConfirmNew();
                 }}
                 className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
               />
@@ -154,7 +198,7 @@ export function SaveExamSetButton({ questions }: Props) {
               </button>
               <button
                 type="button"
-                onClick={() => void handleConfirm()}
+                onClick={() => void handleConfirmNew()}
                 disabled={saving}
                 className="amber-cta w-full sm:w-auto disabled:opacity-40"
               >

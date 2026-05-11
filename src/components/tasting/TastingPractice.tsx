@@ -1,10 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { loadExamSets } from "@/lib/exam-set-storage";
 import { gradePracticeAnswer } from "@/lib/practice-grade";
-import { buildPracticeDeck } from "@/lib/practice-pool";
+import {
+  buildPracticeDeck,
+  buildPracticeDeckFromSavedQuestions,
+} from "@/lib/practice-pool";
+import { fetchSavedSetById } from "@/lib/supabase/saved-sets-client";
+import { useUser } from "@/lib/supabase/use-user";
 import { useQuestions } from "@/lib/store";
+import type { ExamSet } from "@/types/exam-set";
 import type { PracticeItem, PracticeSourceMode } from "@/types/practice";
 import {
   EXAM_YEARS,
@@ -47,6 +55,9 @@ function choiceLabel(i: number): string {
 }
 
 export function TastingPractice() {
+  const searchParams = useSearchParams();
+  const practiceSetId = searchParams.get("practiceSet");
+  const { user, loading: userLoading } = useUser();
   const { questions: generatedList, hydrated } = useQuestions();
 
   const [phase, setPhase] = useState<Phase>("setup");
@@ -68,6 +79,15 @@ export function TastingPractice() {
   const [setupError, setSetupError] = useState<string | null>(null);
   /** Supabase practice_attempts.metadata.session_id 用 */
   const sessionIdRef = useRef<string | null>(null);
+  /** saved_set セッションの saved_question_sets.id（URL の practiceSet） */
+  const savedPracticeSetIdRef = useRef<string | null>(null);
+  const [savedSetBuffer, setSavedSetBuffer] = useState<ExamSet["questions"]>(
+    [],
+  );
+  const [savedSetTitle, setSavedSetTitle] = useState("");
+  const [savedSetLoadError, setSavedSetLoadError] = useState<string | null>(
+    null,
+  );
   /** サマリー表示用（レンダー中に ref を読まないためのスナップショット） */
   const [summaryAnswerLog, setSummaryAnswerLog] = useState<
     (AnswerEntry | undefined)[]
@@ -86,8 +106,84 @@ export function TastingPractice() {
     return () => window.clearInterval(id);
   }, [phase]);
 
+  useEffect(() => {
+    if (!practiceSetId) {
+      setSavedSetBuffer([]);
+      setSavedSetTitle("");
+      setSavedSetLoadError(null);
+      savedPracticeSetIdRef.current = null;
+      return;
+    }
+    if (userLoading) return;
+
+    let cancelled = false;
+    void (async () => {
+      let found: ExamSet | null = null;
+      if (user) {
+        found = await fetchSavedSetById(practiceSetId);
+      }
+      if (!found) {
+        found = loadExamSets().find((s) => s.id === practiceSetId) ?? null;
+      }
+      if (cancelled) return;
+      if (!found || found.questions.length === 0) {
+        setSavedSetLoadError("指定された保存セットを読み込めませんでした。");
+        setSavedSetBuffer([]);
+        setSavedSetTitle("");
+        savedPracticeSetIdRef.current = null;
+        return;
+      }
+      setSavedSetLoadError(null);
+      setSavedSetBuffer(found.questions);
+      setSavedSetTitle(found.name);
+      savedPracticeSetIdRef.current = practiceSetId;
+      setMode("saved_set");
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [practiceSetId, user, userLoading]);
+
   const startSession = useCallback(() => {
     setSetupError(null);
+    if (mode === "saved_set") {
+      if (savedSetBuffer.length === 0) {
+        setSetupError(
+          "保存セットに問題がありません。URL の practiceSet を確認するか、/sets から開き直してください。",
+        );
+        return;
+      }
+      const deckBuilt = buildPracticeDeckFromSavedQuestions({
+        questions: savedSetBuffer,
+        count: Math.min(50, Math.max(1, count)),
+        shuffle,
+      });
+      if (deckBuilt.length === 0) {
+        setSetupError("出題できる問題がありません。");
+        return;
+      }
+      sessionIdRef.current =
+        typeof crypto !== "undefined" &&
+        typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `sess_${Date.now()}`;
+      setSummaryAnswerLog([]);
+      setDeck(deckBuilt);
+      answerLogRef.current = Array.from(
+        { length: deckBuilt.length },
+        () => undefined,
+      );
+      setFlagged(new Set());
+      setIndex(0);
+      setTextAnswer("");
+      setAnswered(false);
+      setSubmittedAnswer("");
+      setResults([]);
+      setElapsed(0);
+      setPhase("quiz");
+      return;
+    }
     if (mode === "generated" && generatedList.length === 0) {
       setSetupError("生成した問題がありません。/generate で先に生成してください。");
       return;
@@ -125,7 +221,7 @@ export function TastingPractice() {
     setResults([]);
     setElapsed(0);
     setPhase("quiz");
-  }, [mode, years, count, shuffle, generatedList]);
+  }, [mode, years, count, shuffle, generatedList, savedSetBuffer]);
 
   /**
    * 回答の確定。正誤は内部的に記録するだけで、ここでは UI に正解/解説を出さない。
@@ -174,6 +270,8 @@ export function TastingPractice() {
         mode,
         years,
         elapsedSec: elapsed,
+        sourceSetId:
+          mode === "saved_set" ? savedPracticeSetIdRef.current : null,
       });
       setPhase("summary");
       return;
@@ -300,23 +398,23 @@ export function TastingPractice() {
               過去問（JSON）と /generate で保存した生成問題から出題します。年度は複数選択・ミックス可です。
             </p>
 
-            <fieldset className="mb-6 space-y-3">
-              <legend className="text-label-caps text-on-surface-variant mb-2 block font-[family-name:var(--font-label-caps)]">
-                出題ソース
-              </legend>
-              {(
-                [
-                  ["past", "過去問のみ"],
-                  ["generated", "生成した問題のみ"],
-                  ["mix", "ミックス（過去 + 生成）"],
-                ] as const
-              ).map(([key, label]) => {
-                const on = mode === key;
-                return (
+            <div className="space-y-6">
+              <fieldset className="space-y-3">
+                <legend className="text-label-caps text-on-surface-variant mb-2 block font-[family-name:var(--font-label-caps)]">
+                  出題ソース
+                </legend>
+                {savedSetLoadError && practiceSetId && (
+                  <p
+                    role="alert"
+                    className="text-body-sm text-error font-[family-name:var(--font-body-sm)]"
+                  >
+                    {savedSetLoadError}
+                  </p>
+                )}
+                {savedSetBuffer.length > 0 && (
                   <label
-                    key={key}
                     className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
-                      on
+                      mode === "saved_set"
                         ? "border-amber-gold/70 bg-amber-gold/5"
                         : "border-glass-stroke hover:border-amber-gold/50"
                     }`}
@@ -324,119 +422,155 @@ export function TastingPractice() {
                     <input
                       type="radio"
                       name="src"
-                      checked={on}
-                      onChange={() => setMode(key)}
+                      checked={mode === "saved_set"}
+                      onChange={() => setMode("saved_set")}
                     />
                     <span className="text-body-lg font-[family-name:var(--font-body-lg)]">
-                      {label}
+                      保存セット（{savedSetTitle || "指定"}）· {savedSetBuffer.length}{" "}
+                      問
                     </span>
                   </label>
-                );
-              })}
-            </fieldset>
-
-            {(mode === "past" || mode === "mix") && (
-              <div className="mb-6 space-y-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
-                    過去問の年度
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setYears(allYearsChecked ? [] : [...EXAM_YEARS])
-                    }
-                    className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)]"
-                  >
-                    {allYearsChecked ? "全解除" : "全選択"}
-                  </button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {EXAM_YEARS.map((y) => {
-                    const on = years.includes(y);
-                    return (
-                      <label
-                        key={y}
-                        className={`text-label-caps cursor-pointer rounded-full border px-3 py-2 font-[family-name:var(--font-label-caps)] ${
-                          on
-                            ? "border-amber-gold bg-amber-gold text-cask-brown"
-                            : "border-glass-stroke text-on-surface-variant hover:border-amber-gold"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="sr-only"
-                          checked={on}
-                          onChange={() => setYears(toggleYear(years, y))}
-                        />
-                        {y}
-                      </label>
-                    );
-                  })}
-                </div>
-                {mode === "past" && years.length === 0 && (
-                  <p className="text-body-sm text-error font-[family-name:var(--font-body-sm)]">
-                    1 年度以上選択してください。
-                  </p>
                 )}
+                {(
+                  [
+                    ["past", "過去問のみ"],
+                    ["generated", "生成した問題のみ"],
+                    ["mix", "ミックス（過去 + 生成）"],
+                  ] as const
+                ).map(([key, label]) => {
+                  const on = mode === key;
+                  return (
+                    <label
+                      key={key}
+                      className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                        on
+                          ? "border-amber-gold/70 bg-amber-gold/5"
+                          : "border-glass-stroke hover:border-amber-gold/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="src"
+                        checked={on}
+                        onChange={() => setMode(key)}
+                      />
+                      <span className="text-body-lg font-[family-name:var(--font-body-lg)]">
+                        {label}
+                      </span>
+                    </label>
+                  );
+                })}
+              </fieldset>
+
+              {(mode === "past" || mode === "mix") && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+                      過去問の年度
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setYears(allYearsChecked ? [] : [...EXAM_YEARS])
+                      }
+                      className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)]"
+                    >
+                      {allYearsChecked ? "全解除" : "全選択"}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {EXAM_YEARS.map((y) => {
+                      const on = years.includes(y);
+                      return (
+                        <label
+                          key={y}
+                          className={`text-label-caps cursor-pointer rounded-full border px-3 py-2 font-[family-name:var(--font-label-caps)] ${
+                            on
+                              ? "border-amber-gold bg-amber-gold text-cask-brown"
+                              : "border-glass-stroke text-on-surface-variant hover:border-amber-gold"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={on}
+                            onChange={() => setYears(toggleYear(years, y))}
+                          />
+                          {y}
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {mode === "past" && years.length === 0 && (
+                    <p className="text-body-sm text-error font-[family-name:var(--font-body-sm)]">
+                      1 年度以上選択してください。
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+                    問題数（最大 50）
+                  </span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={count}
+                    onChange={(e) =>
+                      setCount(
+                        Math.min(50, Math.max(1, Number(e.target.value) || 1)),
+                      )
+                    }
+                    className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+                  />
+                </label>
+                <label className="wq-checkbox-row sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    checked={shuffle}
+                    onChange={(e) => setShuffle(e.target.checked)}
+                  />
+                  <span className="text-body-lg text-on-surface font-[family-name:var(--font-body-lg)]">
+                    シャッフルして出題
+                  </span>
+                </label>
               </div>
-            )}
 
-            <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
-                  問題数（最大 50）
-                </span>
-                <input
-                  type="number"
-                  min={1}
-                  max={50}
-                  value={count}
-                  onChange={(e) =>
-                    setCount(
-                      Math.min(50, Math.max(1, Number(e.target.value) || 1)),
-                    )
-                  }
-                  className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
-                />
-              </label>
-              <label className="flex items-end gap-3 pb-2">
-                <input
-                  type="checkbox"
-                  checked={shuffle}
-                  onChange={(e) => setShuffle(e.target.checked)}
-                />
-                <span className="text-body-lg font-[family-name:var(--font-body-lg)]">
-                  シャッフルして出題
-                </span>
-              </label>
-            </div>
+              {!hydrated && mode !== "saved_set" && (
+                <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+                  生成問題リストを読込中…
+                </p>
+              )}
 
-            {!hydrated && (
-              <p className="text-body-sm text-on-surface-variant mb-2 font-[family-name:var(--font-body-sm)]">
-                生成問題リストを読込中…
-              </p>
-            )}
+              {setupError && (
+                <p
+                  role="alert"
+                  className="text-body-sm text-error border-error/40 bg-error/10 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+                >
+                  {setupError}
+                </p>
+              )}
 
-            {setupError && (
-              <p
-                role="alert"
-                className="text-body-sm text-error border-error/40 bg-error/10 mb-4 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+              <button
+                type="button"
+                disabled={
+                  mode === "saved_set"
+                    ? savedSetBuffer.length === 0
+                    : !hydrated
+                }
+                onClick={startSession}
+                className="amber-cta w-full"
               >
-                {setupError}
-              </p>
-            )}
-
-            <button
-              type="button"
-              disabled={!hydrated}
-              onClick={startSession}
-              className="amber-cta w-full"
-            >
-              テイスティングを開始
-            </button>
+                テイスティングを開始
+              </button>
+            </div>
             <p className="text-body-sm text-on-surface-variant mt-3 text-center font-[family-name:var(--font-body-sm)]">
-              保存済みの生成問題: {generatedList.length} 問
+              {mode === "saved_set"
+                ? `保存セット: ${savedSetBuffer.length} 問`
+                : `保存済みの生成問題: ${generatedList.length} 問`}
             </p>
           </div>
         )}

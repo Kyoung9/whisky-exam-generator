@@ -60,6 +60,10 @@ export async function POST(req: Request) {
   }
 
   const questions = toGeneratedQuestions(aiParsed.data, {
+    pastMapAnchorId:
+      source.type === "map" && source.imageRef && source.pastMapAnchorId
+        ? source.pastMapAnchorId
+        : undefined,
     mapImageFrom:
       source.type === "map" && source.imageRef
         ? {

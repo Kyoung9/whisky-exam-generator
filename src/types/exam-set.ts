@@ -9,10 +9,17 @@ export type ExamSet = {
   name: string;
   /** 作成 (= 保存) UNIX ms */
   createdAt: number;
+  /** 最終更新（クラウドの updated_at。ローカルのみのときは省略可） */
+  updatedAt?: number;
   /** 任意のメモ */
   memo?: string;
   /** カテゴリのハイライト（カードのアバター表示用、最大2件まで描画） */
   categoryHints?: string[];
   /** 保存スナップショット — 元の生成リストから独立して凍結する */
   questions: GeneratedQuestion[];
+  /** Supabase: 作成者（一覧・詳細表示用） */
+  authorId?: string;
+  authorDisplayName?: string | null;
+  /** Supabase: 他ユーザーに一覧表示するか（未設定はローカルのみ） */
+  isPublic?: boolean;
 };

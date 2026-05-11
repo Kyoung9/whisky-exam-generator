@@ -19,6 +19,8 @@ import { CSS } from "@dnd-kit/utilities";
 
 import { QuestionCard } from "@/components/QuestionCard";
 import { QuestionEditor } from "@/components/QuestionEditor";
+import { SourceQuestionDialog } from "@/components/SourceQuestionDialog";
+import { PastExamReferencesDialog } from "@/components/PastExamReferencesDialog";
 import { useQuestions } from "@/lib/store";
 import type { GeneratedQuestion } from "@/types/question";
 
@@ -40,6 +42,8 @@ function SortableItem({
   onMoveUp,
   onMoveDown,
   onGenerateSimilar,
+  onShowSource,
+  onShowPastExamReferences,
 }: {
   question: GeneratedQuestion;
   index: number;
@@ -52,6 +56,8 @@ function SortableItem({
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   onGenerateSimilar?: () => void;
+  onShowSource?: () => void;
+  onShowPastExamReferences?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: question.id });
@@ -76,6 +82,8 @@ function SortableItem({
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
           onGenerateSimilar={onGenerateSimilar}
+          onShowSource={onShowSource}
+          onShowPastExamReferences={onShowPastExamReferences}
           dragHandleProps={{ ...attributes, ...listeners }}
         />
       )}
@@ -96,6 +104,12 @@ export function QuestionList({ onGenerateSimilar }: Props) {
     move,
   } = useQuestions();
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [sourceForModal, setSourceForModal] = useState<GeneratedQuestion | null>(
+    null,
+  );
+  const [pastRefsForModal, setPastRefsForModal] = useState<string[] | null>(
+    null,
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
@@ -200,11 +214,41 @@ export function QuestionList({ onGenerateSimilar }: Props) {
                 onGenerateSimilar={
                   onGenerateSimilar ? () => onGenerateSimilar(q) : undefined
                 }
+                onShowSource={
+                  q.sourceQuestionId
+                    ? () => {
+                        const found = questions.find(
+                          (item) => item.id === q.sourceQuestionId,
+                        );
+                        if (found) {
+                          setSourceForModal(found);
+                        }
+                      }
+                    : undefined
+                }
+                onShowPastExamReferences={
+                  q.sourcePastExamIds && q.sourcePastExamIds.length > 0
+                    ? () => setPastRefsForModal(q.sourcePastExamIds)
+                    : undefined
+                }
               />
             ))}
           </div>
         </SortableContext>
       </DndContext>
+      {sourceForModal && (
+        <SourceQuestionDialog
+          source={sourceForModal}
+          onClose={() => setSourceForModal(null)}
+        />
+      )}
+      {pastRefsForModal && (
+        <PastExamReferencesDialog
+          key={pastRefsForModal.join("|")}
+          pastExamIds={pastRefsForModal}
+          onClose={() => setPastRefsForModal(null)}
+        />
+      )}
     </div>
   );
 }

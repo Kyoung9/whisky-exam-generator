@@ -22,6 +22,7 @@ Strict requirements:
 - For "true_false_count" provide 4 statements as "choices" and put the count of true statements (e.g. "2") in "answer".
 - For "matching" / "timeline" / "table": describe the question in "body" using text only, without external image URLs.
 - For "map": If the user message includes a "REFERENCE MAP" block, every type="map" question you output is for that SAME printed figure. Write Japanese like real exams (e.g. 右の地図の中から… / 番号を答えなさい). The numbered markers on the figure are fixed — invent NEW place or distillery names appropriate to the map region; do not copy the reference item verbatim. "answer" must be exactly one string that appears in "choices". Do not output image URLs; the app attaches the file.
+- For "map" with REFERENCE MAP: You do NOT see the bitmap—only text. "explanation" and "answer" MUST agree: if the explanation describes a location as 北東側 / 沿岸の東寄り / 島の南側 etc., the "answer" marker must be the one that SAME explanation logically picks (same direction/region). Never write an explanation implying one quadrant and an answer implying the opposite. After drafting the explanation, re-read it and set "answer" to the matching marker only.
 - For "map", you MUST always include a "choices" array: list every circled marker on the map that the examinee can pick from, lowest to highest, each entry a single label as printed (e.g. ["①", "②", "③", ...]). Derive how many markers and which symbols (circled vs Arabic) from the REFERENCE MAP description and the example stem style in the user message; if the description gives a range like ①〜⑮, include exactly that many strings. This mirrors the map legend for on-screen lists and PDFs even though the real booklet shows numbers on the figure.
 - If there is NO reference map in the user message, still include "choices" as a plausible ordered list of map markers (e.g. ① through ⑫) matching what you describe in "body", and set "answer" to one of them.
 - DO NOT generate "image_based" questions. We cannot supply visual assets for newly generated questions. If a past question of type "image_based" is provided as inspiration, convert the visual content into a fully text-based question (e.g., type="multiple_choice") that captures the same testing intent without requiring an image.`;
@@ -51,13 +52,18 @@ function summarizePastQuestions(qs: PastExamQuestion[]): string {
 
 function mapReferenceUserBlock(anchor: PastExamQuestion): string {
   const idTag = `${anchor.year} #${anchor.number}${anchor.subNumber ? `-${anchor.subNumber}` : ""}`;
+  const refAnswer =
+    anchor.answer && String(anchor.answer).trim() !== ""
+      ? `Printed answer for that reference sub-item (different location from yours; use ONLY to infer numeral style such as ① vs 3): ${anchor.answer}`
+      : "(No printed answer in dataset for reference item.)";
   return `
 REFERENCE MAP (fixed figure reused for all type="map" questions in this batch):
 - Past exam item: ${idTag} (${anchor.category})
 - What the map shows (for wording only; do not reveal answers): ${anchor.imageDescription ?? "(no description)"}
 - Example stem style from that exam (do not copy the asked location or answer): ${anchor.body.replace(/\n/g, " ").slice(0, 400)}${anchor.body.length > 400 ? "…" : ""}
+- ${refAnswer}
 
-All generated type="map" questions MUST refer to this same figure (same layout and numbering). Vary only what is being asked (different labels).`;
+All generated type="map" questions MUST refer to this same figure (same layout and numbering). Vary only what is being asked (different labels). Your "answer" must follow the geographic reasoning in your own "explanation" for the NEW place you ask about.`;
 }
 
 export function buildGeneratePrompt(input: {

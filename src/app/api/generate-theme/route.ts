@@ -75,6 +75,11 @@ export async function POST(req: Request) {
     }
   }
 
+  const pastExamIds = [
+    ...pastQuestionSamples.map((q) => q.id),
+    ...(mapAnchor ? [mapAnchor.id] : []),
+  ];
+
   const { system, user } = buildThemePrompt({
     theme,
     count,
@@ -102,6 +107,8 @@ export async function POST(req: Request) {
   }
 
   const questions = toGeneratedQuestions(aiParsed.data, {
+    pastMapAnchorId: type === "map" && mapAnchor ? mapAnchor.id : undefined,
+    sourcePastExamIds: Array.from(new Set(pastExamIds)).filter(Boolean),
     mapImageFrom:
       type === "map" && mapAnchor?.imageRef
         ? {

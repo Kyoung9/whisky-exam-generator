@@ -4,10 +4,12 @@ import { BottomNav } from "@/components/whisky-quest/BottomNav";
 import {
   loadAnalytics,
   type AnalyticsSnapshot,
+  type CategoryTypeCell,
   type CategoryStat,
   type DayStat,
   type TypeStat,
 } from "@/lib/analytics-data";
+import { QUESTION_TYPE_LABELS, type QuestionType } from "@/types/question";
 
 /**
  * /analytics — 学習データの「深い分析」ビュー
@@ -32,17 +34,9 @@ function pct(v: number | null | undefined): string {
   return `${Math.round(v * 100)}%`;
 }
 
-const QUESTION_TYPE_LABELS: Record<string, string> = {
-  multiple_choice: "選択式",
-  short_answer: "短答",
-  essay: "記述",
-  fill_in_the_blank: "穴埋め",
-  true_false: "○×",
-  unknown: "不明",
-};
-
 function typeLabel(t: string): string {
-  return QUESTION_TYPE_LABELS[t] ?? t;
+  if (t in QUESTION_TYPE_LABELS) return QUESTION_TYPE_LABELS[t as QuestionType];
+  return t;
 }
 
 export default async function AnalyticsPage() {
@@ -123,6 +117,7 @@ function SignedIn({ data }: { data: AnalyticsSnapshot }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
           <CategoryBreakdown rows={data.categoryStats} />
+          <CategoryTypeHeatmap stats={data.categoryTypeStats} />
           <DailyTrend
             rows={data.dailyStats}
             studyDays={data.studyDays30d}
@@ -267,6 +262,186 @@ function CategoryBreakdown({ rows }: { rows: CategoryStat[] }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// カテゴリ × 出題タイプ交差（ヒートマップ）
+// ---------------------------------------------------------------------------
+
+function CategoryTypeHeatmap({ stats }: { stats: CategoryTypeCell[] }) {
+  const cats = Array.from(new Set(stats.map((s) => s.category)));
+  const types = Array.from(new Set(stats.map((s) => s.type)));
+
+  if (stats.length === 0 || cats.length === 0 || types.length === 0) {
+    return (
+      <section className="glass-panel rounded-xl p-4 sm:p-6">
+        <header className="mb-5 flex items-center gap-2">
+          <span
+            className="material-symbols-outlined text-amber-gold text-base"
+            aria-hidden="true"
+          >
+            grid_view
+          </span>
+          <h2 className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+            カテゴリ × 出題タイプ
+          </h2>
+        </header>
+        <p className="text-body-sm text-on-surface-variant/70 font-[family-name:var(--font-body-sm)]">
+          まだデータがありません。
+        </p>
+      </section>
+    );
+  }
+
+  // 並び順: 精度が低い方（弱点）を先頭に
+  const catAgg = new Map<string, { attempts: number; correct: number }>();
+  const typeAgg = new Map<string, { attempts: number; correct: number }>();
+  for (const s of stats) {
+    const c = catAgg.get(s.category) ?? { attempts: 0, correct: 0 };
+    c.attempts += s.attempts;
+    c.correct += s.correct;
+    catAgg.set(s.category, c);
+
+    const t = typeAgg.get(s.type) ?? { attempts: 0, correct: 0 };
+    t.attempts += s.attempts;
+    t.correct += s.correct;
+    typeAgg.set(s.type, t);
+  }
+
+  const categories = [...catAgg.entries()]
+    .map(([category, v]) => ({
+      category,
+      accuracy: v.attempts > 0 ? v.correct / v.attempts : 0,
+    }))
+    .sort((a, b) => a.accuracy - b.accuracy)
+    .map((x) => x.category);
+
+  const typeOrder = [...typeAgg.entries()]
+    .map(([type, v]) => ({
+      type,
+      accuracy: v.attempts > 0 ? v.correct / v.attempts : 0,
+    }))
+    .sort((a, b) => a.accuracy - b.accuracy)
+    .map((x) => x.type);
+
+  const byKey = new Map<string, CategoryTypeCell>();
+  for (const s of stats) {
+    byKey.set(`${s.category}|||${s.type}`, s);
+  }
+
+  function cellBg(acc: number): string {
+    // 精度が低いほど赤みを強く（弱点が目立つ）
+    if (acc >= 0.8) return "rgba(255, 191, 0, 0.65)";
+    if (acc >= 0.6) return "rgba(255, 191, 0, 0.35)";
+    if (acc >= 0.4) return "rgba(255, 120, 60, 0.35)";
+    return "rgba(255, 60, 60, 0.18)";
+  }
+
+  const gridColumns = `minmax(8rem, 1fr) repeat(${typeOrder.length}, minmax(6.2rem, 1fr))`;
+
+  return (
+    <section className="glass-panel rounded-xl p-4 sm:p-6">
+      <header className="mb-5 flex items-center gap-2">
+        <span
+          className="material-symbols-outlined text-amber-gold text-base"
+          aria-hidden="true"
+        >
+          grid_view
+        </span>
+        <h2 className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
+          カテゴリ × 出題タイプ（弱点マップ）
+        </h2>
+      </header>
+
+      <p className="text-body-sm text-on-surface-variant/70 mb-4 font-[family-name:var(--font-body-sm)]">
+        左上ほど弱点になりやすいです（色は正答率）。
+      </p>
+
+      <div className="overflow-x-auto">
+        <div
+          className="grid gap-2"
+          style={{
+            gridTemplateColumns: gridColumns,
+          }}
+        >
+          {/* header row */}
+          <div className="text-label-caps text-on-surface-variant/80 text-[10px] font-[family-name:var(--font-label-caps)]">
+            カテゴリ
+          </div>
+          {typeOrder.map((t) => (
+            <div
+              key={t}
+              className="text-label-caps text-on-surface-variant/80 text-[10px] font-[family-name:var(--font-label-caps)] text-center"
+            >
+              {typeLabel(t)}
+            </div>
+          ))}
+
+          {categories.map((cat) => {
+            // 1 行: 左端カテゴリセル + 各タイプセル
+            const rowCells = [
+              <div
+                key={`row-${cat}`}
+                className="text-body-sm text-on-surface font-medium font-[family-name:var(--font-body-sm)] flex items-center"
+              >
+                {cat}
+              </div>,
+              ...typeOrder.map((t) => {
+                const s = byKey.get(`${cat}|||${t}`);
+                const attempts = s?.attempts ?? 0;
+                const acc = s?.accuracy ?? 0;
+                const has = attempts > 0;
+                const tooltip = has
+                  ? `${cat} / ${typeLabel(t)}\n${attempts}問\n正答率 ${Math.round(acc * 100)}%`
+                  : `${cat} / ${typeLabel(t)}\n学習なし`;
+
+                return (
+                  <div
+                    key={`cell-${cat}-${t}`}
+                    title={tooltip}
+                    className="h-11 rounded-lg border px-2 text-center"
+                    style={{
+                      background: has
+                        ? cellBg(acc)
+                        : "rgba(255,255,255,0.02)",
+                      borderColor: has
+                        ? "rgba(255,191,0,0.28)"
+                        : "rgba(255,255,255,0.06)",
+                    }}
+                  >
+                    <span className="text-title-md text-on-surface tabular-nums font-[family-name:var(--font-title-md)]">
+                      {has ? `${Math.round(acc * 100)}%` : "—"}
+                    </span>
+                  </div>
+                );
+              }),
+            ];
+
+            return rowCells;
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-[10px] text-label-caps text-on-surface-variant/70 font-[family-name:var(--font-label-caps)]">
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(255, 191, 0, 0.65)" }} />
+          80%+
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(255, 191, 0, 0.35)" }} />
+          60〜79%
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(255, 120, 60, 0.35)" }} />
+          40〜59%
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-sm" style={{ background: "rgba(255, 60, 60, 0.18)" }} />
+          0〜39%
+        </span>
+      </div>
     </section>
   );
 }

@@ -42,7 +42,7 @@ export function GenerateForm({ onGenerated }: Props) {
     "multiple_choice",
     "true_false_count",
   ]);
-  const [count, setCount] = useState(10);
+  const [count, setCount] = useState(0);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [includeExplanation, setIncludeExplanation] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -62,6 +62,10 @@ export function GenerateForm({ onGenerated }: Props) {
     e.preventDefault();
     if (years.length === 0 || categories.length === 0 || types.length === 0) {
       setError("年度・カテゴリー・問題タイプを 1 つ以上選択してください。");
+      return;
+    }
+    if (!Number.isFinite(count) || count < 1) {
+      setError("出題数は 1 以上を入力してください。");
       return;
     }
     setError(null);
@@ -250,31 +254,48 @@ export function GenerateForm({ onGenerated }: Props) {
             {count} 問
           </span>
         </div>
-        <input
-          id="generate-count"
-          type="range"
-          min={1}
-          max={30}
-          value={count}
-          onChange={(e) => setCount(Number(e.target.value) || 1)}
-          aria-valuemin={1}
-          aria-valuemax={30}
-          aria-valuenow={count}
-          className="w-full"
-        />
-        <div className="text-on-surface-variant mt-2 flex justify-between text-[10px] font-[family-name:var(--font-label-caps)]">
-          <span>1</span>
-          <span>30</span>
-        </div>
+          <input
+            id="generate-count"
+            type="number"
+            min={0}
+            max={30}
+            step={1}
+            value={count}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (!Number.isFinite(v)) {
+                setCount(0);
+                return;
+              }
+              setCount(Math.max(0, Math.min(30, Math.floor(v))));
+            }}
+            aria-valuemin={0}
+            aria-valuemax={30}
+            aria-valuenow={count}
+            className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+          />
+          <div className="text-on-surface-variant mt-2 flex justify-between text-[10px] font-[family-name:var(--font-label-caps)]">
+            <span>0</span>
+            <span>30</span>
+          </div>
+
+          {count < 1 ? (
+            <p className="text-body-sm text-on-surface-variant/70 mt-2 font-[family-name:var(--font-body-sm)]">
+              未設定（0 の場合は生成できません。1 以上を入力してください）
+            </p>
+          ) : (
+            <p className="text-body-sm text-on-surface-variant/70 mt-2 font-[family-name:var(--font-body-sm)]">
+              入力中：{count} 問を生成します
+            </p>
+          )}
       </div>
 
       {/* 解説を含める */}
-      <label className="border-glass-stroke bg-glass-fill flex cursor-pointer items-center gap-3 rounded-xl border p-4">
+      <label className="wq-checkbox-row">
         <input
           type="checkbox"
           checked={includeExplanation}
           onChange={(e) => setIncludeExplanation(e.target.checked)}
-          className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
         />
         <span className="text-body-lg flex-1 font-[family-name:var(--font-body-lg)]">
           解説を含める
@@ -293,7 +314,11 @@ export function GenerateForm({ onGenerated }: Props) {
         </p>
       )}
 
-      <button type="submit" disabled={loading} className="amber-cta w-full">
+      <button
+        type="submit"
+        disabled={loading || count < 1}
+        className="amber-cta w-full"
+      >
         {loading ? (
           <>
             <span

@@ -44,6 +44,18 @@ export function generatedQuestionToPractice(q: GeneratedQuestion): PracticeItem 
   };
 }
 
+/** 保存セット内の生成問題だけからデッキを作る（テイスティング用） */
+export function buildPracticeDeckFromSavedQuestions(opts: {
+  questions: GeneratedQuestion[];
+  count: number;
+  shuffle: boolean;
+}): PracticeItem[] {
+  let pool = opts.questions.map((q) => generatedQuestionToPractice(q));
+  pool = opts.shuffle ? shuffle(pool) : [...pool];
+  const n = Math.max(1, Math.min(opts.count, pool.length));
+  return pool.slice(0, n);
+}
+
 /**
  * 過去問・生成問題から演習デッキを構築する。
  * - 過去問のみ: years が空なら過去問はプールに含めない（UI で 1 年度以上必須）。

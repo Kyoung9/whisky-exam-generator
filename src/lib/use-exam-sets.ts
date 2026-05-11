@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { ExamSet } from "@/types/exam-set";
+import type { GeneratedQuestion } from "@/types/question";
+import { applyExamSetPatch } from "@/lib/exam-set-merge";
 import { loadExamSets, saveExamSets } from "@/lib/exam-set-storage";
 import {
   deleteSavedSetRemote,
   fetchMySavedSets,
   insertSavedSet,
-  updateSavedSetTitleRemote,
+  updateSavedSetRemote,
 } from "@/lib/supabase/saved-sets-client";
 import { useUser } from "@/lib/supabase/use-user";
 
@@ -24,6 +26,14 @@ export type UseExamSets = {
   addSet: (input: Omit<ExamSet, "id" | "createdAt">) => Promise<ExamSet>;
   removeSet: (id: string) => void;
   renameSet: (id: string, name: string) => void;
+  updateSet: (
+    id: string,
+    patch: {
+      name?: string;
+      questions?: GeneratedQuestion[];
+      isPublic?: boolean;
+    },
+  ) => Promise<void>;
   /** ログイン済みでローカルに残っているセットをクラウドへ一括アップロード */
   migrateLocalSetsToCloud: () => Promise<number>;
 };
@@ -76,12 +86,45 @@ export function useExamSets(): UseExamSets {
     saveExamSets(sets);
   }, [sets, hydrated, user]);
 
+  const updateSet = useCallback<UseExamSets["updateSet"]>(
+    async (id, patch) => {
+      let snapshotBefore: ExamSet[] = [];
+      let applied = false;
+      setSets((prev) => {
+        snapshotBefore = prev;
+        const idx = prev.findIndex((s) => s.id === id);
+        if (idx < 0) return prev;
+        applied = true;
+        const merged = applyExamSetPatch(prev[idx]!, patch);
+        const next = [...prev];
+        next[idx] = merged;
+        if (!user) saveExamSets(next);
+        return next;
+      });
+      if (!applied) return;
+      if (!user) return;
+      try {
+        await updateSavedSetRemote(id, {
+          title: patch.name,
+          questions: patch.questions,
+          is_public: patch.isPublic,
+        });
+      } catch (e) {
+        console.error("[updateSet]", e);
+        setSets(snapshotBefore);
+        throw e;
+      }
+    },
+    [user],
+  );
+
   const addSet = useCallback<UseExamSets["addSet"]>(
     async (input) => {
       if (user) {
         const created = await insertSavedSet({
           name: input.name,
           questions: input.questions,
+          isPublic: input.isPublic ?? true,
         });
         setSets((prev) => [created, ...prev]);
         return created;
@@ -90,6 +133,7 @@ export function useExamSets(): UseExamSets {
         ...input,
         id: makeLocalId(),
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
       setSets((prev) => [created, ...prev]);
       return created;
@@ -104,23 +148,20 @@ export function useExamSets(): UseExamSets {
           console.error("[removeSet]", e),
         );
       }
-      setSets((prev) => prev.filter((s) => s.id !== id));
+      setSets((prev) => {
+        const next = prev.filter((s) => s.id !== id);
+        if (!user) saveExamSets(next);
+        return next;
+      });
     },
     [user],
   );
 
   const renameSet = useCallback<UseExamSets["renameSet"]>(
     (id, name) => {
-      if (user) {
-        void updateSavedSetTitleRemote(id, name).catch((e) =>
-          console.error("[renameSet]", e),
-        );
-      }
-      setSets((prev) =>
-        prev.map((s) => (s.id === id ? { ...s, name } : s)),
-      );
+      void updateSet(id, { name });
     },
-    [user],
+    [updateSet],
   );
 
   const migrateLocalSetsToCloud = useCallback<UseExamSets["migrateLocalSetsToCloud"]>(
@@ -131,7 +172,11 @@ export function useExamSets(): UseExamSets {
       let uploaded = 0;
       for (const s of local) {
         try {
-          await insertSavedSet({ name: s.name, questions: s.questions });
+          await insertSavedSet({
+            name: s.name,
+            questions: s.questions,
+            isPublic: s.isPublic ?? true,
+          });
           uploaded += 1;
         } catch (e) {
           console.error("[migrateLocalSetsToCloud]", e);
@@ -151,6 +196,7 @@ export function useExamSets(): UseExamSets {
     addSet,
     removeSet,
     renameSet,
+    updateSet,
     migrateLocalSetsToCloud,
   };
 }

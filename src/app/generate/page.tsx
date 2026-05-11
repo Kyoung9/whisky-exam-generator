@@ -2,7 +2,8 @@
 
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { GenerateForm } from "@/components/GenerateForm";
 import { PdfDownloadButton } from "@/components/PdfDownloadButton";
 import { QuestionList } from "@/components/QuestionList";
@@ -11,7 +12,12 @@ import { SimilarQuestionDialog } from "@/components/SimilarQuestionDialog";
 import { ThemeGenerateForm } from "@/components/ThemeGenerateForm";
 import { AppHeader } from "@/components/whisky-quest/AppHeader";
 import { BottomNav } from "@/components/whisky-quest/BottomNav";
+import { loadExamSets } from "@/lib/exam-set-storage";
+import { takePendingGeneratorAppend } from "@/lib/generator-import-bridge";
+import { fetchSavedSetById } from "@/lib/supabase/saved-sets-client";
+import { useUser } from "@/lib/supabase/use-user";
 import { QuestionsProvider, useQuestions } from "@/lib/store";
+import type { ExamSet } from "@/types/exam-set";
 import type { GeneratedQuestion } from "@/types/question";
 
 const PdfPreviewModal = dynamic(
@@ -30,10 +36,84 @@ const AI_DISCLAIMER =
   "AIが生成した問題・解答・解説は必ず確認してください。";
 
 function GenerateInner() {
-  const { append, appendAfter, hydrated, questions } = useQuestions();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const editSetId = searchParams.get("editSet");
+  const importPending = searchParams.get("importPending");
+  const { user, loading: userLoading } = useUser();
+  const { append, appendAfter, hydrated, questions, setQuestions } =
+    useQuestions();
   const [similarSource, setSimilarSource] =
     useState<GeneratedQuestion | null>(null);
   const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<{
+    id: string;
+    name: string;
+    allowOverwrite: boolean;
+  } | null>(null);
+  const [editBanner, setEditBanner] = useState<string | null>(null);
+  const [editLoadError, setEditLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!editSetId) {
+      setEditTarget(null);
+      setEditBanner(null);
+      setEditLoadError(null);
+      return;
+    }
+    if (userLoading) return;
+    // QuestionsProvider の localStorage hydrate より後で上書きしないと、
+    // 古い生成バッファが DB から開いたセットを潰す
+    if (!hydrated) return;
+
+    let cancelled = false;
+    void (async () => {
+      setEditLoadError(null);
+      setEditBanner(null);
+      try {
+        let found: ExamSet | null = null;
+        if (user) {
+          found = await fetchSavedSetById(editSetId);
+        }
+        if (!found) {
+          found = loadExamSets().find((s) => s.id === editSetId) ?? null;
+        }
+        if (cancelled) return;
+        if (!found) {
+          setEditTarget(null);
+          setEditLoadError("指定されたセットが見つかりません。");
+          return;
+        }
+        const allowOverwrite = !user
+          ? true
+          : !found.authorId || found.authorId === user.id;
+        setEditTarget({
+          id: found.id,
+          name: found.name,
+          allowOverwrite,
+        });
+        setQuestions(found.questions.map((q) => ({ ...q })));
+        setEditBanner(
+          allowOverwrite
+            ? `編集中: 「${found.name}」 — サイドバーから上書き保存できます。`
+            : `「${found.name}」を開きました（他ユーザーのセット）。上書きはできず、別名保存のみ可能です。`,
+        );
+      } catch {
+        if (!cancelled) setEditLoadError("セットの読込に失敗しました。");
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editSetId, user, userLoading, hydrated, setQuestions]);
+
+  useEffect(() => {
+    if (importPending !== "1" || !hydrated) return;
+    const incoming = takePendingGeneratorAppend();
+    if (incoming?.length) append(incoming);
+    router.replace("/generate", { scroll: false });
+  }, [importPending, hydrated, append, router]);
 
   const total = questions.length;
   const selected = questions.filter((q) => q.selected).length;
@@ -43,6 +123,22 @@ function GenerateInner() {
       <AppHeader active="distill" />
 
       <main className="mx-auto max-w-[1280px] px-4 pt-[calc(5rem+env(safe-area-inset-top,0px)+3rem)] sm:px-6 md:px-16">
+        {editBanner && (
+          <p
+            role="status"
+            className="text-body-sm text-amber-gold border-amber-gold/40 bg-amber-gold/10 mb-6 rounded border px-4 py-3 font-[family-name:var(--font-body-sm)]"
+          >
+            {editBanner}
+          </p>
+        )}
+        {editLoadError && (
+          <p
+            role="alert"
+            className="text-body-sm text-error border-error/40 bg-error/10 mb-6 rounded border px-4 py-3 font-[family-name:var(--font-body-sm)]"
+          >
+            {editLoadError}
+          </p>
+        )}
         {/* Hero */}
         <header className="mb-8 md:mb-10">
           <p className="text-label-caps text-amber-gold mb-2 font-[family-name:var(--font-label-caps)]">
@@ -149,7 +245,10 @@ function GenerateInner() {
                       questions={questions}
                       onOpen={() => setPdfPreviewOpen(true)}
                     />
-                    <SaveExamSetButton questions={questions} />
+                    <SaveExamSetButton
+                      questions={questions}
+                      editTarget={editTarget}
+                    />
                   </>
                 ) : (
                   <button
@@ -206,10 +305,26 @@ function GenerateInner() {
   );
 }
 
+function GenerateFallback() {
+  return (
+    <div className="bg-background-deep text-on-surface min-h-dvh pb-with-bottom-nav">
+      <AppHeader active="distill" />
+      <main className="mx-auto max-w-[1280px] px-4 pt-[calc(5rem+env(safe-area-inset-top,0px)+3rem)] sm:px-6 md:px-16">
+        <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+          読込中…
+        </p>
+      </main>
+      <BottomNav active="distill" />
+    </div>
+  );
+}
+
 export default function GeneratePage() {
   return (
     <QuestionsProvider>
-      <GenerateInner />
+      <Suspense fallback={<GenerateFallback />}>
+        <GenerateInner />
+      </Suspense>
     </QuestionsProvider>
   );
 }

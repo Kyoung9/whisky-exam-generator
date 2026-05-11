@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { PastExamAnchorDialog } from "@/components/PastExamAnchorDialog";
 import {
   DIFFICULTY_LABELS,
   QUESTION_TYPE_LABELS,
@@ -13,6 +15,8 @@ type Props = {
   onEdit?: () => void;
   onDelete?: () => void;
   onGenerateSimilar?: () => void;
+  onShowSource?: () => void;
+  onShowPastExamReferences?: () => void;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>;
@@ -26,11 +30,15 @@ export function QuestionCard({
   onEdit,
   onDelete,
   onGenerateSimilar,
+  onShowSource,
+  onShowPastExamReferences,
   onMoveUp,
   onMoveDown,
   dragHandleProps,
 }: Props) {
   const selected = question.selected;
+  const [pastAnchorOpen, setPastAnchorOpen] = useState(false);
+
   return (
     <article
       className={`glass-card rounded-xl p-5 transition-colors ${
@@ -55,13 +63,13 @@ export function QuestionCard({
           THEME · {question.theme}
         </span>
         {onToggleSelect && (
-          <label className="text-body-sm text-on-surface-variant ml-auto flex items-center gap-2 font-[family-name:var(--font-body-sm)]">
+          <label className="wq-checkbox-inline text-body-sm text-on-surface-variant ml-auto font-[family-name:var(--font-body-sm)]">
             <input
               type="checkbox"
               checked={selected}
               onChange={onToggleSelect}
             />
-            PDF に含める
+            <span>PDF に含める</span>
           </label>
         )}
       </header>
@@ -209,6 +217,53 @@ export function QuestionCard({
             似た問題
           </button>
         )}
+        {onShowPastExamReferences &&
+          question.sourcePastExamIds &&
+          question.sourcePastExamIds.length > 0 && (
+            <button
+              type="button"
+              onClick={onShowPastExamReferences}
+              className="amber-cta-outline"
+            >
+              <span
+                className="material-symbols-outlined text-base"
+                aria-hidden="true"
+              >
+                menu_book
+              </span>
+              参照した問題
+            </button>
+          )}
+        {onShowSource && question.sourceQuestionId && (
+          <button
+            type="button"
+            onClick={onShowSource}
+            className="amber-cta-outline"
+          >
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              history
+            </span>
+            参照元
+          </button>
+        )}
+        {question.pastMapAnchorId && (
+          <button
+            type="button"
+            onClick={() => setPastAnchorOpen(true)}
+            className="amber-cta-outline"
+          >
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              history_edu
+            </span>
+            参照過去問
+          </button>
+        )}
         {onDelete && (
           <button
             type="button"
@@ -225,6 +280,13 @@ export function QuestionCard({
           </button>
         )}
       </footer>
+
+      {pastAnchorOpen && question.pastMapAnchorId && (
+        <PastExamAnchorDialog
+          pastExamId={question.pastMapAnchorId}
+          onClose={() => setPastAnchorOpen(false)}
+        />
+      )}
     </article>
   );
 }
