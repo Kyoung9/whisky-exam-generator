@@ -102,9 +102,9 @@ export function SaveExamSetButton({ questions, editTarget }: Props) {
           type="button"
           onClick={() => void handleOverwrite()}
           disabled={disabled || saving}
-          className="bg-amber-gold text-cask-brown hover:brightness-110 mt-3 flex w-full items-center justify-center gap-2 rounded border border-transparent px-4 py-3 font-[family-name:var(--font-label-caps)] text-[12px] tracking-[0.08em] uppercase transition-colors disabled:opacity-40"
+          className="amber-cta mt-3 w-full"
         >
-          <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+          <span className="material-symbols-outlined" aria-hidden="true">
             save
           </span>
           「{editTarget.name}」を更新して保存
@@ -119,11 +119,9 @@ export function SaveExamSetButton({ questions, editTarget }: Props) {
           setOpen(true);
         }}
         disabled={disabled}
-        className={`border-amber-gold text-amber-gold hover:bg-amber-gold/10 mt-3 flex w-full items-center justify-center gap-2 rounded border px-4 py-3 font-[family-name:var(--font-label-caps)] text-[12px] tracking-[0.08em] uppercase transition-colors disabled:opacity-40 ${
-          editTarget?.allowOverwrite ? "" : ""
-        }`}
+        className="amber-cta-outline mt-3 w-full"
       >
-        <span className="material-symbols-outlined text-[18px]" aria-hidden="true">
+        <span className="material-symbols-outlined" aria-hidden="true">
           bookmark_add
         </span>
         {editTarget?.allowOverwrite

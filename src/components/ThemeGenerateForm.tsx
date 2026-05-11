@@ -20,7 +20,7 @@ type Props = {
 // テーマ別の追加生成 (README §3.12) - サイドバー用 glass パネル
 export function ThemeGenerateForm({ onGenerated }: Props) {
   const [theme, setTheme] = useState("");
-  const [count, setCount] = useState(5);
+  const [count, setCount] = useState(0);
   const [difficulty, setDifficulty] = useState<Difficulty>("medium");
   const [category, setCategory] = useState<Category | "">("");
   const [type, setType] = useState<QuestionType | "">("");
@@ -31,6 +31,10 @@ export function ThemeGenerateForm({ onGenerated }: Props) {
     e.preventDefault();
     if (theme.trim().length === 0) {
       setError("テーマを入力してください。");
+      return;
+    }
+    if (!Number.isFinite(count) || count < 1) {
+      setError("数は 1 以上を入力してください。");
       return;
     }
     setError(null);
@@ -102,10 +106,18 @@ export function ThemeGenerateForm({ onGenerated }: Props) {
             </span>
             <input
               type="number"
-              min={1}
+              min={0}
               max={20}
+              step={1}
               value={count}
-              onChange={(e) => setCount(Number(e.target.value) || 1)}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isFinite(v)) {
+                  setCount(0);
+                  return;
+                }
+                setCount(Math.max(0, Math.min(20, Math.floor(v))));
+              }}
               className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
             />
           </label>
@@ -126,6 +138,12 @@ export function ThemeGenerateForm({ onGenerated }: Props) {
             </select>
           </label>
         </div>
+        {count < 1 ? (
+          <p className="text-body-sm text-on-surface-variant/70 leading-snug font-[family-name:var(--font-body-sm)] [word-break:keep-all]">
+            <span className="block">未設定です。0 では生成できません。</span>
+            <span className="block">1 以上を入力してください。</span>
+          </p>
+        ) : null}
 
         <div className="grid grid-cols-1 gap-3">
           <label className="space-y-2">
@@ -177,7 +195,11 @@ export function ThemeGenerateForm({ onGenerated }: Props) {
           </p>
         )}
 
-        <button type="submit" disabled={loading} className="amber-cta w-full">
+        <button
+          type="submit"
+          disabled={loading || count < 1}
+          className="amber-cta w-full"
+        >
           {loading ? (
             <>
               <span

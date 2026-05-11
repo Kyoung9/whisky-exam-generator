@@ -275,7 +275,7 @@
   cursor: not-allowed;
 }
 
-/* 二次CTA: アンバー枠線のみ (誤答を優先, 全選択 等) */
+/* 二次CTA: アンバー枠線のみ。角は一次 .amber-cta と同じ 0 で横並びでも破綻しない */
 .amber-cta-outline {
   display: inline-flex;
   align-items: center;
@@ -289,7 +289,7 @@
   text-transform: uppercase;
   font-weight: 500;
   padding: 0.5rem 1rem;
-  border-radius: 9999px;
+  border-radius: 0;
   border: 1px solid var(--amber-gold);
   transition:
     background-color 150ms ease,
