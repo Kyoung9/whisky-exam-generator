@@ -35,6 +35,8 @@ export async function POST(req: Request) {
       ...source,
       type: source.type as QuestionType,
       difficulty: source.difficulty as Difficulty,
+      imageRef: source.imageRef,
+      imageDescription: source.imageDescription,
     },
     count,
     mode,
@@ -57,6 +59,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const questions = toGeneratedQuestions(aiParsed.data);
+  const questions = toGeneratedQuestions(aiParsed.data, {
+    mapImageFrom:
+      source.type === "map" && source.imageRef
+        ? {
+            imageRef: source.imageRef,
+            imageSourcePage: source.imageSourcePage,
+            imageDescription: source.imageDescription,
+          }
+        : undefined,
+  });
   return NextResponse.json({ questions });
 }

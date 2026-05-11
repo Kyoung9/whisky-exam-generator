@@ -7,6 +7,8 @@ export type PracticeSourceMode = "past" | "generated" | "mix";
 export type PracticeItem = {
   id: string;
   source: "past" | "generated";
+  /** Supabase practice_attempts.category 用（未設定時は unknown） */
+  category?: string;
   year?: number;
   body: string;
   choices?: string[];

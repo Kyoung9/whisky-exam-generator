@@ -46,6 +46,13 @@ export function SimilarQuestionDialog({
             answer: source.answer,
             explanation: source.explanation,
             difficulty: source.difficulty,
+            ...(source.imageRef ? { imageRef: source.imageRef } : {}),
+            ...(source.imageSourcePage !== undefined
+              ? { imageSourcePage: source.imageSourcePage }
+              : {}),
+            ...(source.imageDescription
+              ? { imageDescription: source.imageDescription }
+              : {}),
           },
           count,
           mode,

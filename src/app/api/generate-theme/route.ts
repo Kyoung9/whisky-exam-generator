@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { callJsonChatWithOptionalReview } from "@/lib/ai-question-pipeline";
-import { getFilteredPastQuestions, stratifiedSamplePastQuestions } from "@/lib/exams";
+import {
+  getFilteredPastQuestions,
+  getPastMapQuestionsWithImage,
+  stratifiedSamplePastQuestions,
+} from "@/lib/exams";
 import { buildThemePrompt } from "@/lib/prompts";
 import {
   aiResponseSchema,
@@ -13,6 +17,7 @@ import {
   EXAM_YEARS,
   type Category,
   type Difficulty,
+  type PastExamQuestion,
   type QuestionType,
 } from "@/types/question";
 
@@ -49,6 +54,27 @@ export async function POST(req: Request) {
     Math.min(8, themePool.length)
   );
 
+  let mapAnchor: PastExamQuestion | null = null;
+  if (type === "map") {
+    const candidates = getPastMapQuestionsWithImage({
+      years: [...EXAM_YEARS],
+      categories: categoryFilter,
+    }).filter((q) => q.difficulty === difficulty);
+    mapAnchor =
+      candidates.length > 0
+        ? candidates[Math.floor(Math.random() * candidates.length)]!
+        : null;
+    if (!mapAnchor) {
+      return NextResponse.json(
+        {
+          error:
+            "この難易度・カテゴリに合う画像付きの地図問題がありません。条件を変えてください。",
+        },
+        { status: 422 },
+      );
+    }
+  }
+
   const { system, user } = buildThemePrompt({
     theme,
     count,
@@ -56,6 +82,7 @@ export async function POST(req: Request) {
     category: category as Category | undefined,
     type: type as QuestionType | undefined,
     pastQuestionSamples,
+    mapAnchor: type === "map" ? mapAnchor : undefined,
   });
 
   let raw: unknown;
@@ -74,6 +101,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const questions = toGeneratedQuestions(aiParsed.data);
+  const questions = toGeneratedQuestions(aiParsed.data, {
+    mapImageFrom:
+      type === "map" && mapAnchor?.imageRef
+        ? {
+            imageRef: mapAnchor.imageRef,
+            imageSourcePage: mapAnchor.imageSourcePage,
+            imageDescription: mapAnchor.imageDescription,
+          }
+        : undefined,
+  });
   return NextResponse.json({ questions });
 }

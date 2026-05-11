@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { AppHeader } from "@/components/whisky-quest/AppHeader";
 import { BottomNav } from "@/components/whisky-quest/BottomNav";
+import { loadExamSets } from "@/lib/exam-set-storage";
+import { useUser } from "@/lib/supabase/use-user";
 import { useExamSets } from "@/lib/use-exam-sets";
 import type { ExamSet } from "@/types/exam-set";
 
@@ -54,11 +56,19 @@ function tier(count: number): string {
 }
 
 export default function SetsPage() {
-  const { sets, hydrated, removeSet } = useExamSets();
+  const { user, loading: userLoading } = useUser();
+  const { sets, hydrated, removeSet, migrateLocalSetsToCloud } = useExamSets();
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("newest");
   const [sortOpen, setSortOpen] = useState(false);
   const [previewSet, setPreviewSet] = useState<ExamSet | null>(null);
+  const [migrating, setMigrating] = useState(false);
+  const [migrateBanner, setMigrateBanner] = useState<string | null>(null);
+
+  const localSetsCount =
+    !userLoading && user && typeof window !== "undefined"
+      ? loadExamSets().length
+      : 0;
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -119,6 +129,47 @@ export default function SetsPage() {
             </span>
           </Link>
         </section>
+
+        {hydrated && user && localSetsCount > 0 && (
+          <div className="border-amber-gold/30 bg-amber-gold/5 mb-8 flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-body-sm text-on-surface font-[family-name:var(--font-body-sm)]">
+              このブラウザに保存されたローカルセットが{" "}
+              <span className="text-amber-gold font-semibold">{localSetsCount}</span>{" "}
+              件あります。クラウドに移すとダッシュボードの MY EXAMS と同期されます。
+            </p>
+            <button
+              type="button"
+              disabled={migrating}
+              onClick={() => {
+                setMigrateBanner(null);
+                setMigrating(true);
+                void migrateLocalSetsToCloud()
+                  .then((n) => {
+                    setMigrateBanner(
+                      n > 0
+                        ? `${n} 件をクラウドに移しました`
+                        : "移行できるセットがありませんでした",
+                    );
+                  })
+                  .catch(() => {
+                    setMigrateBanner("移行に失敗しました。もう一度お試しください。");
+                  })
+                  .finally(() => setMigrating(false));
+              }}
+              className="text-label-caps bg-amber-gold text-cask-brown shrink-0 rounded-lg px-4 py-2 font-bold transition-opacity hover:opacity-90 disabled:opacity-40 font-[family-name:var(--font-label-caps)]"
+            >
+              {migrating ? "移行中…" : "ローカルセットをクラウドへ移行"}
+            </button>
+          </div>
+        )}
+        {migrateBanner && (
+          <p
+            role="status"
+            className="text-body-sm text-amber-gold mb-6 font-[family-name:var(--font-body-sm)]"
+          >
+            {migrateBanner}
+          </p>
+        )}
 
         {/* 検索 + ソート */}
         <div className="border-glass-stroke mb-8 flex flex-wrap items-center justify-between gap-4 border-b pb-6">

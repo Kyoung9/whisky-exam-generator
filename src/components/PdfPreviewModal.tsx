@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { QuestionPdf, type QuestionPdfOptions } from "@/lib/pdf/QuestionPdf";
 import type { GeneratedQuestion } from "@/types/question";
 
@@ -35,7 +36,7 @@ type Props = {
   onClose: () => void;
 };
 
-// PDF プレビュー + ダウンロード (README §3.13 / §3.14 / §5.3) - WhiskyQuest dark トーン
+// PDF プレビュー + ダウンロード — ポータルで body 直下に載せフルビューポート相当に
 export function PdfPreviewModal({ questions, onClose }: Props) {
   const [title, setTitle] = useState("ウイスキーエキスパート 予想問題集");
   const [includeAnswer, setIncludeAnswer] = useState(true);
@@ -53,14 +54,14 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
 
   const fileName = `${title || "questions"}.pdf`;
 
-  return (
+  const modal = (
     <div
-      className="bg-background-deep/80 fixed inset-0 z-50 flex flex-col items-stretch p-0 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-4"
+      className="bg-background-deep/80 fixed inset-0 z-[100] flex flex-col items-stretch p-0 pt-[env(safe-area-inset-top,0px)] pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-sm sm:flex sm:items-center sm:justify-center sm:p-3"
       role="dialog"
       aria-modal
       aria-labelledby="pdf-preview-title"
     >
-      <div className="glass-panel flex max-h-[100dvh] min-h-0 w-full flex-1 flex-col overflow-hidden rounded-none sm:max-h-[min(900px,calc(100dvh-2rem))] sm:max-w-5xl sm:flex-initial sm:rounded-xl">
+      <div className="glass-panel flex h-[100dvh] max-h-[100dvh] w-full min-h-0 flex-1 flex-col overflow-hidden rounded-none sm:h-auto sm:max-h-[min(95dvh,calc(100dvh-1.5rem))] sm:w-full sm:max-w-[min(96rem,calc(100vw-1.5rem))] sm:flex-initial sm:rounded-xl">
         <header className="border-glass-stroke flex shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-6 sm:py-4">
           <h3
             id="pdf-preview-title"
@@ -89,8 +90,8 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
           </button>
         </header>
 
-        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(200px,1fr)] overflow-hidden lg:grid-cols-[280px_1fr] lg:grid-rows-1">
-          <aside className="border-glass-stroke max-h-[42dvh] space-y-4 overflow-y-auto border-b p-4 sm:space-y-5 sm:p-5 lg:max-h-none lg:border-r lg:border-b-0">
+        <div className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[auto_minmax(220px,1fr)] overflow-hidden lg:grid-cols-[minmax(240px,300px)_1fr] lg:grid-rows-1">
+          <aside className="border-glass-stroke max-h-[38dvh] space-y-4 overflow-y-auto border-b p-4 sm:space-y-5 sm:p-5 lg:max-h-none lg:border-r lg:border-b-0">
             <label className="block space-y-2">
               <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
                 PDF タイトル
@@ -103,30 +104,27 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
             </label>
 
             <div className="space-y-3">
-              <label className="text-body-lg flex items-center gap-2 font-[family-name:var(--font-body-lg)]">
+              <label className="text-body-lg flex items-center gap-3 font-[family-name:var(--font-body-lg)]">
                 <input
                   type="checkbox"
                   checked={includeAnswer}
                   onChange={(e) => setIncludeAnswer(e.target.checked)}
-                  className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
                 />
                 正解を含める
               </label>
-              <label className="text-body-lg flex items-center gap-2 font-[family-name:var(--font-body-lg)]">
+              <label className="text-body-lg flex items-center gap-3 font-[family-name:var(--font-body-lg)]">
                 <input
                   type="checkbox"
                   checked={includeExplanation}
                   onChange={(e) => setIncludeExplanation(e.target.checked)}
-                  className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
                 />
                 解説を含める
               </label>
-              <label className="text-body-lg flex items-center gap-2 font-[family-name:var(--font-body-lg)]">
+              <label className="text-body-lg flex items-center gap-3 font-[family-name:var(--font-body-lg)]">
                 <input
                   type="checkbox"
                   checked={onlySelected}
                   onChange={(e) => setOnlySelected(e.target.checked)}
-                  className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
                 />
                 選択した問題のみ出力
               </label>
@@ -176,7 +174,7 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
             )}
           </aside>
 
-          <div className="bg-surface-container-low/60 min-h-[200px] flex-1 overflow-hidden lg:min-h-0">
+          <div className="bg-surface-container-low/60 min-h-[220px] flex-1 overflow-hidden lg:min-h-0">
             {filtered.length > 0 ? (
               <PDFViewer
                 key={`${title}|${includeAnswer}|${includeExplanation}|${onlySelected}|${filtered.length}`}
@@ -195,4 +193,6 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
       </div>
     </div>
   );
+
+  return createPortal(modal, document.body);
 }

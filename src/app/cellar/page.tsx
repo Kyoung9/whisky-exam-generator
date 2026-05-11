@@ -10,18 +10,22 @@ import {
 } from "@/lib/dashboard-data";
 
 /**
- * /cellar - WhiskyQuest「ダッシュボード」
+ * /cellar — ダッシュボード = 「今日の学習ハブ」
  *
- * Server Component で Supabase から本人データを集計し、
- * 学習進捗・弱点カテゴリ・オ答ノート・保存セットを表示する。
- * 未ログイン時は「空状態 + サインイン CTA」を出す。
+ * 役割を明確化:
+ *   - 今週/連続学習日の進捗を一目で
+ *   - 「次に何をすべきか」を 1 つの強い CTA で提案 (最弱カテゴリ復習 or 新規模試)
+ *   - 未解決誤答 と 保存済セット を最近順に少しだけ
+ *
+ * 深い分析 (全カテゴリ正答率、出題タイプ別、日別ヒートマップ) は
+ * /analytics に分離。ここから「もっと見る」リンクで遷移する。
  */
 
 export const dynamic = "force-dynamic";
 
 const NUMBER_FMT = new Intl.NumberFormat("ja-JP");
 
-function formatPercent(value: number | null): string {
+function pct(value: number | null): string {
   if (value == null) return "—";
   return `${Math.round(value * 100)}%`;
 }
@@ -48,12 +52,8 @@ export default async function CellarPage() {
     <div className="bg-background-deep text-on-surface min-h-dvh pb-with-bottom-nav">
       <AppHeader active="cellar" />
 
-      <main className="mx-auto w-full max-w-[1280px] px-4 pt-[calc(5rem+env(safe-area-inset-top,0px)+1.5rem)] sm:px-6 md:px-16">
-        {data.user ? (
-          <SignedInDashboard data={data} />
-        ) : (
-          <SignedOutHero />
-        )}
+      <main className="mx-auto w-full max-w-[1280px] px-4 pt-[calc(5rem+env(safe-area-inset-top,0px)+1.5rem)] pb-12 sm:px-6 md:px-16">
+        {data.user ? <SignedInDashboard data={data} /> : <SignedOutHero />}
       </main>
 
       <BottomNav active="cellar" />
@@ -62,21 +62,21 @@ export default async function CellarPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Signed-in: 本番ダッシュボード
+// Signed-in
 // ---------------------------------------------------------------------------
 
 function SignedInDashboard({ data }: { data: DashboardSnapshot }) {
   const user = data.user;
-  if (!user) return null; // caller でガード済みだが TS 絞り込み用
+  if (!user) return null;
   const accuracy7d =
     data.attempts7d > 0 ? data.correct7d / data.attempts7d : null;
-
   const greeting = greetingFor(user);
+  const weakest = data.weakCategories[0];
+  const fresh = data.totalAttempts === 0;
 
   return (
     <>
-      {/* Hero: 挨拶 + 今週サマリー */}
-      <section className="mb-10">
+      <section className="mb-8">
         <p className="text-label-caps text-amber-gold mb-2 font-[family-name:var(--font-label-caps)]">
           ダッシュボード
         </p>
@@ -84,41 +84,56 @@ function SignedInDashboard({ data }: { data: DashboardSnapshot }) {
           {greeting}
         </h1>
         <p className="text-body-lg text-on-surface-variant max-w-2xl font-[family-name:var(--font-body-lg)]">
-          今週の学習状況と弱点カテゴリ、復習が必要な問題が一目で分かります。
+          今週の進捗と、次に挑むべき問題を一目で。
+          <Link
+            href="/analytics"
+            className="text-amber-gold ml-2 inline-flex items-center gap-1 underline-offset-4 hover:underline"
+          >
+            もっと深く見る
+            <span
+              className="material-symbols-outlined text-base"
+              aria-hidden="true"
+            >
+              arrow_forward
+            </span>
+          </Link>
         </p>
       </section>
 
-      {/* KPI 4つ */}
+      {/* 強い 1 つの推薦 CTA + KPI 横並び */}
+      <NextActionCard
+        weakest={weakest}
+        unresolved={data.unresolvedWrongCount}
+        fresh={fresh}
+      />
+
       <section
-        aria-label="今週の学習指標"
-        className="mb-10 grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4"
+        aria-label="今週の指標"
+        className="mb-10 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4"
       >
         <KpiCard
-          label="今週の挑戦数"
+          label="今週の挑戦"
           value={NUMBER_FMT.format(data.attempts7d)}
-          subtitle={`うち 正答 ${data.correct7d}`}
+          subtitle={`正答 ${data.correct7d}`}
           accent
         />
+        <KpiCard label="今週の正答率" value={pct(accuracy7d)} />
         <KpiCard
-          label="今週の正答率"
-          value={formatPercent(accuracy7d)}
+          label="連続学習"
+          value={`${data.currentStreak} 日`}
+          subtitle={`今月 ${data.studyDays30d}/30 日学習`}
         />
         <KpiCard
-          label="30日間の正答率"
-          value={formatPercent(data.accuracy30d)}
-          subtitle={`累計 ${NUMBER_FMT.format(data.totalAttempts)} 問`}
-        />
-        <KpiCard
-          label="未解決オ答"
+          label="未解決誤答"
           value={NUMBER_FMT.format(data.unresolvedWrongCount)}
-          subtitle={`学習日数 ${data.studyDays30d} / 30`}
+          subtitle={
+            data.unresolvedWrongCount > 0 ? "復習で解決" : "クリア!"
+          }
         />
       </section>
 
-      {/* 2カラム: 左 チャート + オ答ノート / 右 セット + クイック */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         <div className="space-y-6 lg:col-span-8">
-          <WeakCategoriesPanel rows={data.weakCategories} />
           <WrongNotesPanel notes={data.wrongNotes} />
         </div>
 
@@ -155,7 +170,115 @@ function greetingFor(user: NonNullable<DashboardSnapshot["user"]>): string {
 }
 
 // ---------------------------------------------------------------------------
-// KPI カード
+// Next Action: 「次に何をする」を 1 枚で提示する強いカード
+// ---------------------------------------------------------------------------
+
+function NextActionCard({
+  weakest,
+  unresolved,
+  fresh,
+}: {
+  weakest: WeakCategoryRow | undefined;
+  unresolved: number;
+  fresh: boolean;
+}) {
+  let icon = "wine_bar";
+  let kicker = "次のアクション";
+  let title = "新しい模擬試験を始める";
+  let body = "ランダム出題で実力をチェックしましょう。";
+  let primaryHref = "/tasting";
+  let primaryLabel = "模擬試験を始める";
+  let secondary: { href: string; label: string } | null = {
+    href: "/generate",
+    label: "問題を生成",
+  };
+
+  if (fresh) {
+    icon = "rocket_launch";
+    kicker = "ようこそ";
+    title = "まずは 1 度、模擬試験を体験";
+    body =
+      "過去問または生成問題で 5 分の腕試し。終えるとカテゴリ別の弱点が見えるようになります。";
+  } else if (unresolved > 0) {
+    icon = "task_alt";
+    kicker = "今日の優先";
+    title = `未解決の誤答ノートが ${unresolved} 件`;
+    body = "間違えた問題を復習して、確実に解決済みにしましょう。";
+    primaryHref = "/tasting";
+    primaryLabel = "復習を始める";
+    secondary = weakest
+      ? {
+          href: "/analytics",
+          label: "弱点を分析",
+        }
+      : null;
+  } else if (weakest && weakest.accuracy < 0.7) {
+    icon = "radar";
+    kicker = "今日の優先";
+    title = `${weakest.category} の正答率は ${Math.round(weakest.accuracy * 100)}%`;
+    body = `挑戦 ${weakest.attempts} 回中 ${weakest.correct} 正答。このカテゴリを集中的に練習しましょう。`;
+    primaryLabel = "このテーマで練習";
+    secondary = {
+      href: "/generate",
+      label: "AIに問題を作らせる",
+    };
+  }
+
+  return (
+    <section
+      aria-label="次のアクション"
+      className="border-amber-gold/30 from-amber-gold/10 mb-8 overflow-hidden rounded-xl border bg-gradient-to-br to-transparent p-5 sm:p-6"
+    >
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <div
+            aria-hidden="true"
+            className="bg-amber-gold/15 text-amber-gold flex h-12 w-12 shrink-0 items-center justify-center rounded-lg"
+          >
+            <span className="material-symbols-outlined text-2xl">{icon}</span>
+          </div>
+          <div className="min-w-0">
+            <p className="text-label-caps text-amber-gold/80 mb-1 font-[family-name:var(--font-label-caps)]">
+              {kicker}
+            </p>
+            <h2 className="text-title-md text-on-surface mb-1 font-[family-name:var(--font-title-md)]">
+              {title}
+            </h2>
+            <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+              {body}
+            </p>
+          </div>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            href={primaryHref}
+            className="bg-amber-gold text-cask-brown text-label-caps inline-flex h-12 items-center gap-2 rounded-lg px-5 font-bold transition-all hover:brightness-110 active:scale-[0.98] font-[family-name:var(--font-label-caps)]"
+          >
+            <span
+              className="material-symbols-outlined text-[20px]"
+              style={{ fontVariationSettings: '"FILL" 1' }}
+              aria-hidden="true"
+            >
+              play_arrow
+            </span>
+            {primaryLabel}
+          </Link>
+          {secondary && (
+            <Link
+              href={secondary.href}
+              className="border-amber-gold/40 text-amber-gold hover:bg-amber-gold/5 text-label-caps inline-flex h-12 items-center gap-2 rounded-lg border px-5 transition-colors font-[family-name:var(--font-label-caps)]"
+            >
+              {secondary.label}
+            </Link>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// KPI
 // ---------------------------------------------------------------------------
 
 function KpiCard({
@@ -191,78 +314,7 @@ function KpiCard({
 }
 
 // ---------------------------------------------------------------------------
-// 弱点カテゴリ (user_weak_categories ビュー)
-// ---------------------------------------------------------------------------
-
-function WeakCategoriesPanel({ rows }: { rows: WeakCategoryRow[] }) {
-  return (
-    <section className="glass-panel rounded-xl p-4 sm:p-6">
-      <header className="mb-5 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span
-            className="material-symbols-outlined text-amber-gold text-base"
-            aria-hidden="true"
-          >
-            radar
-          </span>
-          <h2 className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
-            弱点カテゴリ TOP {rows.length || 5}
-          </h2>
-        </div>
-        <Link
-          href="/profile"
-          className="text-label-caps text-amber-gold/70 hover:text-amber-gold font-[family-name:var(--font-label-caps)] text-[10px] underline-offset-4 hover:underline"
-        >
-          すべて見る
-        </Link>
-      </header>
-
-      {rows.length === 0 ? (
-        <p className="text-body-sm text-on-surface-variant/70 font-[family-name:var(--font-body-sm)]">
-          まだデータがありません。
-          <Link
-            href="/tasting"
-            className="text-amber-gold ml-2 underline-offset-4 hover:underline"
-          >
-            模擬試験を始める
-          </Link>
-        </p>
-      ) : (
-        <ul className="space-y-3">
-          {rows.map((row) => (
-            <li key={row.category}>
-              <div className="mb-1 flex items-baseline justify-between gap-3">
-                <span className="text-body-sm text-on-surface font-medium font-[family-name:var(--font-body-sm)]">
-                  {row.category}
-                </span>
-                <span className="text-label-caps text-on-surface-variant tabular-nums font-[family-name:var(--font-label-caps)]">
-                  {row.correct}/{row.attempts} ({Math.round(row.accuracy * 100)}%)
-                </span>
-              </div>
-              <div
-                className="bg-cask-brown/60 h-1.5 w-full overflow-hidden rounded-full"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={Math.round(row.accuracy * 100)}
-              >
-                <div
-                  className="bg-amber-gold h-full rounded-full"
-                  style={{
-                    width: `${Math.max(4, Math.round(row.accuracy * 100))}%`,
-                  }}
-                />
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// オ答ノート (wrong_answer_notes resolved=false)
+// 復習が必要な問題 (誤答ノート 最新 5)
 // ---------------------------------------------------------------------------
 
 function WrongNotesPanel({ notes }: { notes: WrongNoteCard[] }) {
@@ -290,7 +342,7 @@ function WrongNotesPanel({ notes }: { notes: WrongNoteCard[] }) {
 
       {notes.length === 0 ? (
         <p className="text-body-sm text-on-surface-variant/70 font-[family-name:var(--font-body-sm)]">
-          オ答ノートはありません。よくできています。
+          誤答ノートはありません。よくできています。
         </p>
       ) : (
         <ul className="space-y-3">
@@ -322,7 +374,7 @@ function WrongNotesPanel({ notes }: { notes: WrongNoteCard[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// My Sets
+// My Sets (最近 3 件)
 // ---------------------------------------------------------------------------
 
 function MySetsPanel({ sets }: { sets: SetCard[] }) {
@@ -337,7 +389,7 @@ function MySetsPanel({ sets }: { sets: SetCard[] }) {
             bookmarks
           </span>
           <h2 className="text-label-caps text-on-surface-variant font-[family-name:var(--font-label-caps)]">
-            マイセット
+            マイ EXAMS
           </h2>
         </div>
         <Link
@@ -401,27 +453,9 @@ function QuickActionsPanel() {
         クイックアクション
       </h2>
       <div className="grid grid-cols-1 gap-2">
-        <ActionLink
-          href="/tasting"
-          icon="wine_bar"
-          label="模擬試験を始める"
-          primary
-        />
-        <ActionLink
-          href="/generate"
-          icon="science"
-          label="問題を生成"
-        />
-        <ActionLink
-          href="/archive"
-          icon="auto_stories"
-          label="過去問を開く"
-        />
-        <ActionLink
-          href="/sets"
-          icon="inventory_2"
-          label="MY EXAMS"
-        />
+        <ActionLink href="/generate" icon="science" label="問題を生成" />
+        <ActionLink href="/archive" icon="auto_stories" label="過去問を開く" />
+        <ActionLink href="/analytics" icon="query_stats" label="深い分析" />
       </div>
     </section>
   );
@@ -431,24 +465,18 @@ function ActionLink({
   href,
   icon,
   label,
-  primary,
 }: {
   href: string;
   icon: string;
   label: string;
-  primary?: boolean;
 }) {
-  const cls = primary
-    ? "bg-amber-gold text-cask-brown hover:brightness-110"
-    : "border-glass-stroke text-amber-gold hover:bg-amber-gold/5 border bg-transparent";
   return (
     <Link
       href={href}
-      className={`flex h-12 items-center justify-center gap-2 rounded-lg font-bold transition-all ${cls}`}
+      className="border-glass-stroke text-amber-gold hover:bg-amber-gold/5 flex h-12 items-center justify-center gap-2 rounded-lg border bg-transparent font-bold transition-all"
     >
       <span
         className="material-symbols-outlined text-[20px]"
-        style={primary ? { fontVariationSettings: '"FILL" 1' } : undefined}
         aria-hidden="true"
       >
         {icon}
@@ -461,7 +489,7 @@ function ActionLink({
 }
 
 // ---------------------------------------------------------------------------
-// Signed-out: サインイン CTA + アプリ紹介
+// Signed-out
 // ---------------------------------------------------------------------------
 
 function SignedOutHero() {
@@ -477,9 +505,9 @@ function SignedOutHero() {
       desc: "過去問と生成問をミックスして採点。",
     },
     {
-      icon: "radar",
-      label: "弱点カテゴリを可視化",
-      desc: "ログインすると、学習進捗・正答率・オ答ノートがそのままダッシュボードに。",
+      icon: "query_stats",
+      label: "学習データを分析",
+      desc: "サインインすると、カテゴリ別の正答率や連続学習日数がここに集まります。",
     },
     {
       icon: "bookmarks",
@@ -495,12 +523,10 @@ function SignedOutHero() {
           WhiskyQuest ダッシュボード
         </p>
         <h1 className="text-headline-lg-mobile sm:text-headline-lg lg:text-display-lg text-amber-gold mb-4 font-[family-name:var(--font-display-lg)]">
-          学習データを保存して
-          <br />
-          あなたの弱点を見える化。
+          今日の学習を、ひと目で。
         </h1>
         <p className="text-body-lg text-on-surface-variant mb-6 max-w-xl font-[family-name:var(--font-body-lg)]">
-          サインインすると、試行・正答率・弱点カテゴリ・オ答ノートがこの画面に表示されます。
+          サインインすると、今週の挑戦数・正答率・未解決誤答・次に挑むべきカテゴリがここに表示されます。
         </p>
         <div className="flex flex-wrap gap-3">
           <Link
@@ -525,7 +551,7 @@ function SignedOutHero() {
             <span className="material-symbols-outlined" aria-hidden="true">
               flash_on
             </span>
-            サインインしですぐ試す
+            サインインせずに試す
           </Link>
         </div>
       </section>

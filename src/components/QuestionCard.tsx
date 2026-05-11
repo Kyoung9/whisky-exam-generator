@@ -60,7 +60,6 @@ export function QuestionCard({
               type="checkbox"
               checked={selected}
               onChange={onToggleSelect}
-              className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded bg-transparent"
             />
             PDF に含める
           </label>
@@ -101,6 +100,14 @@ export function QuestionCard({
             ))}
           </ol>
         )}
+
+        {/* 地図問題は本番も図上の番号が選択肢だが、choices 未生成の旧データ用に注記する */}
+        {question.type === "map" &&
+          (!question.choices || question.choices.length === 0) && (
+            <p className="text-body-sm text-on-surface-variant border-glass-stroke rounded-lg border border-dashed px-3 py-2 font-[family-name:var(--font-body-sm)]">
+              選択肢は地図上に記された番号（①②…など）です。図を参照して該当する番号を答えてください。
+            </p>
+          )}
 
         {question.answer && (
           <div className="border-amber-gold/40 bg-amber-gold/10 rounded border-l-2 px-3 py-2">

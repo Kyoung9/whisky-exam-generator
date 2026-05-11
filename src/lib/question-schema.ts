@@ -62,9 +62,13 @@ export const similarRequestSchema = z.object({
     answer: z.string().optional(),
     explanation: z.string().optional(),
     difficulty: difficultySchema,
+    imageRef: z.string().optional(),
+    imageSourcePage: z.number().int().optional(),
+    imageDescription: z.string().optional(),
   }),
   count: z.number().int().min(1).max(10),
   mode: z.enum(["similar", "same_theme", "same_difficulty", "same_type"]),
+  includeSourceAnswer: z.boolean().optional().default(true),
 });
 
 export type SimilarRequest = z.infer<typeof similarRequestSchema>;
@@ -82,19 +86,42 @@ export type ThemeRequest = z.infer<typeof themeRequestSchema>;
 // AI レスポンスを GeneratedQuestion[] に変換するヘルパ
 export function toGeneratedQuestions(
   ai: AiResponse,
-  options?: { sourceQuestionId?: string }
+  options?: {
+    sourceQuestionId?: string;
+    /** type=map のみ: 過去問の図版を流用する */
+    mapImageFrom?: Pick<
+      GeneratedQuestion,
+      "imageRef" | "imageSourcePage" | "imageDescription"
+    >;
+  }
 ): GeneratedQuestion[] {
-  return ai.questions.map((q) => ({
-    id: crypto.randomUUID(),
-    body: q.body,
-    type: q.type as GeneratedQuestion["type"],
-    category: q.category,
-    theme: q.theme,
-    choices: q.choices,
-    answer: q.answer,
-    explanation: q.explanation,
-    difficulty: q.difficulty as GeneratedQuestion["difficulty"],
-    selected: true,
-    sourceQuestionId: options?.sourceQuestionId,
-  }));
+  const img = options?.mapImageFrom;
+  return ai.questions.map((q) => {
+    const attachMapImage =
+      q.type === "map" && img?.imageRef
+        ? {
+            imageRef: img.imageRef,
+            ...(img.imageSourcePage !== undefined
+              ? { imageSourcePage: img.imageSourcePage }
+              : {}),
+            ...(img.imageDescription !== undefined
+              ? { imageDescription: img.imageDescription }
+              : {}),
+          }
+        : {};
+    return {
+      id: crypto.randomUUID(),
+      body: q.body,
+      type: q.type as GeneratedQuestion["type"],
+      category: q.category,
+      theme: q.theme,
+      choices: q.choices,
+      answer: q.answer,
+      explanation: q.explanation,
+      difficulty: q.difficulty as GeneratedQuestion["difficulty"],
+      selected: true,
+      sourceQuestionId: options?.sourceQuestionId,
+      ...attachMapImage,
+    };
+  });
 }

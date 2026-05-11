@@ -13,6 +13,7 @@ import {
 } from "@/types/question";
 import { AppHeader } from "@/components/whisky-quest/AppHeader";
 import { BottomNav } from "@/components/whisky-quest/BottomNav";
+import { persistPracticeSessionToSupabase } from "@/lib/supabase/practice-session-sync";
 
 type Phase = "setup" | "quiz" | "summary";
 
@@ -35,8 +36,14 @@ function formatElapsed(totalSec: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-function choiceLetter(i: number): string {
-  return String.fromCharCode(65 + i);
+/**
+ * 選択肢ラベル。過去問の正答が「①②③」記法で書かれているので、
+ * UI 表示も原則として丸数字に揃える（①〜⑳）。それを超えたら「(21)」のように退避。
+ * 採点は practice-grade の正規化により ① ↔ 1 を同一視する。
+ */
+const CIRCLED_NUMBERS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+function choiceLabel(i: number): string {
+  return CIRCLED_NUMBERS[i] ?? `(${i + 1})`;
 }
 
 export function TastingPractice() {
@@ -53,12 +60,18 @@ export function TastingPractice() {
   const [flagged, setFlagged] = useState<Set<number>>(() => new Set());
   const [index, setIndex] = useState(0);
   const [textAnswer, setTextAnswer] = useState("");
-  const [revealed, setRevealed] = useState(false);
-  const [lastCorrect, setLastCorrect] = useState<boolean | null>(null);
-  const [lastSubmitted, setLastSubmitted] = useState("");
+  /** 正解の公開はサマリー画面まで遅延。クイズ中は「回答済みかどうか」のみ追跡 */
+  const [answered, setAnswered] = useState(false);
+  const [submittedAnswer, setSubmittedAnswer] = useState("");
   const [results, setResults] = useState<boolean[]>([]);
   const [elapsed, setElapsed] = useState(0);
   const [setupError, setSetupError] = useState<string | null>(null);
+  /** Supabase practice_attempts.metadata.session_id 用 */
+  const sessionIdRef = useRef<string | null>(null);
+  /** サマリー表示用（レンダー中に ref を読まないためのスナップショット） */
+  const [summaryAnswerLog, setSummaryAnswerLog] = useState<
+    (AnswerEntry | undefined)[]
+  >([]);
 
   const current = deck[index] ?? null;
   const hasChoices = Boolean(current?.choices && current.choices.length > 0);
@@ -96,27 +109,35 @@ export function TastingPractice() {
       );
       return;
     }
+    sessionIdRef.current =
+      typeof crypto !== "undefined" &&
+      typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `sess_${Date.now()}`;
+    setSummaryAnswerLog([]);
     setDeck(deckBuilt);
     answerLogRef.current = Array.from({ length: deckBuilt.length }, () => undefined);
     setFlagged(new Set());
     setIndex(0);
     setTextAnswer("");
-    setRevealed(false);
-    setLastCorrect(null);
-    setLastSubmitted("");
+    setAnswered(false);
+    setSubmittedAnswer("");
     setResults([]);
     setElapsed(0);
     setPhase("quiz");
   }, [mode, years, count, shuffle, generatedList]);
 
-  const reveal = useCallback(
+  /**
+   * 回答の確定。正誤は内部的に記録するだけで、ここでは UI に正解/解説を出さない。
+   * 公開はサマリー画面（phase === "summary"）に集約する。
+   */
+  const submitAnswer = useCallback(
     (userRaw: string) => {
-      if (!current || revealed) return;
+      if (!current) return;
       const ok = gradePracticeAnswer(userRaw, current.answer);
       const trimmed = userRaw.trim();
-      setLastCorrect(ok);
-      setLastSubmitted(trimmed);
-      setRevealed(true);
+      setSubmittedAnswer(trimmed);
+      setAnswered(true);
       setResults((prev) => {
         const next = [...prev];
         next[index] = ok;
@@ -124,33 +145,41 @@ export function TastingPractice() {
       });
       answerLogRef.current[index] = { submitted: trimmed, correct: ok };
     },
-    [current, revealed, index, deck.length],
+    [current, index],
   );
 
   const applyIndex = useCallback((nextIndex: number) => {
     const log = answerLogRef.current[nextIndex];
     setIndex(nextIndex);
     if (log) {
-      setRevealed(true);
-      setLastCorrect(log.correct);
-      setLastSubmitted(log.submitted);
+      setAnswered(true);
+      setSubmittedAnswer(log.submitted);
       setTextAnswer(log.submitted);
     } else {
-      setRevealed(false);
-      setLastCorrect(null);
-      setLastSubmitted("");
+      setAnswered(false);
+      setSubmittedAnswer("");
       setTextAnswer("");
     }
   }, []);
 
   const goNext = useCallback(() => {
-    if (!revealed) return;
+    if (!answered) return;
     if (index >= deck.length - 1) {
+      const finalLog = [...answerLogRef.current];
+      setSummaryAnswerLog(finalLog);
+      void persistPracticeSessionToSupabase({
+        deck,
+        answerLog: finalLog,
+        sessionId: sessionIdRef.current ?? `sess_${Date.now()}`,
+        mode,
+        years,
+        elapsedSec: elapsed,
+      });
       setPhase("summary");
       return;
     }
     applyIndex(index + 1);
-  }, [revealed, index, deck.length, applyIndex]);
+  }, [answered, index, deck, applyIndex, mode, years, elapsed]);
 
   const goPrev = useCallback(() => {
     if (index <= 0) return;
@@ -172,11 +201,6 @@ export function TastingPractice() {
   );
 
   const allYearsChecked = years.length === EXAM_YEARS.length;
-
-  const insightFootnote =
-    current?.source === "generated"
-      ? "AI生成のインサイト"
-      : "アーカイブ解説";
 
   return (
     <div className="bg-background-deep text-on-surface relative flex min-h-dvh flex-col">
@@ -286,23 +310,29 @@ export function TastingPractice() {
                   ["generated", "生成した問題のみ"],
                   ["mix", "ミックス（過去 + 生成）"],
                 ] as const
-              ).map(([key, label]) => (
-                <label
-                  key={key}
-                  className="border-glass-stroke hover:border-amber-gold/50 flex cursor-pointer items-center gap-3 rounded-lg border p-3"
-                >
-                  <input
-                    type="radio"
-                    name="src"
-                    checked={mode === key}
-                    onChange={() => setMode(key)}
-                    className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4"
-                  />
-                  <span className="text-body-lg font-[family-name:var(--font-body-lg)]">
-                    {label}
-                  </span>
-                </label>
-              ))}
+              ).map(([key, label]) => {
+                const on = mode === key;
+                return (
+                  <label
+                    key={key}
+                    className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors ${
+                      on
+                        ? "border-amber-gold/70 bg-amber-gold/5"
+                        : "border-glass-stroke hover:border-amber-gold/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="src"
+                      checked={on}
+                      onChange={() => setMode(key)}
+                    />
+                    <span className="text-body-lg font-[family-name:var(--font-body-lg)]">
+                      {label}
+                    </span>
+                  </label>
+                );
+              })}
             </fieldset>
 
             {(mode === "past" || mode === "mix") && (
@@ -370,12 +400,11 @@ export function TastingPractice() {
                   className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
                 />
               </label>
-              <label className="flex items-end gap-3 pb-1">
+              <label className="flex items-end gap-3 pb-2">
                 <input
                   type="checkbox"
                   checked={shuffle}
                   onChange={(e) => setShuffle(e.target.checked)}
-                  className="text-amber-gold border-amber-gold focus:ring-amber-gold h-4 w-4 rounded"
                 />
                 <span className="text-body-lg font-[family-name:var(--font-body-lg)]">
                   シャッフルして出題
@@ -443,66 +472,42 @@ export function TastingPractice() {
                 aria-label="選択肢"
               >
                 {current.choices.map((label, i) => {
-                  const n = i + 1;
-                  const letter = choiceLetter(i);
-                  const isCorrectHere =
-                    revealed && gradePracticeAnswer(String(n), current.answer);
-                  const isWrongPick =
-                    revealed &&
-                    lastCorrect === false &&
-                    lastSubmitted === String(n);
-                  const inactive = revealed && !isCorrectHere && !isWrongPick;
+                  // 表示・送信値とも丸数字で統一（①〜⑳）。グレーディングが ①↔1 を吸収する
+                  const choiceValue = choiceLabel(i);
+                  const isSelected = answered && submittedAnswer === choiceValue;
                   return (
                     <button
                       key={i}
                       type="button"
-                      disabled={revealed}
                       onClick={() => {
-                        setTextAnswer(String(n));
-                        reveal(String(n));
+                        setTextAnswer(choiceValue);
+                        submitAnswer(choiceValue);
                       }}
+                      aria-pressed={isSelected}
                       className={[
                         "glass-card group flex min-h-[3rem] items-start gap-4 border p-6 text-left transition-all",
-                        inactive ? "opacity-55" : "",
-                        !revealed
-                          ? "hover:bg-surface-container-high border-glass-stroke"
-                          : "",
-                        isCorrectHere
-                          ? "inner-glow-active border-amber-gold"
-                          : isWrongPick
-                            ? "border-error/50 bg-error/5"
-                            : revealed
-                              ? "border-glass-stroke"
-                              : "",
+                        "hover:bg-surface-container-high",
+                        isSelected
+                          ? "border-amber-gold inner-glow-active"
+                          : "border-glass-stroke",
                       ].join(" ")}
                     >
                       <span
-                        className={`text-label-caps w-8 shrink-0 font-[family-name:var(--font-label-caps)] ${
-                          isCorrectHere
+                        className={`text-title-md w-8 shrink-0 font-[family-name:var(--font-title-md)] ${
+                          isSelected
                             ? "text-amber-gold"
-                            : isWrongPick
-                              ? "text-error"
-                              : "text-on-surface-variant group-hover:text-amber-gold"
+                            : "text-on-surface-variant group-hover:text-amber-gold"
                         }`}
                       >
-                        {letter}
+                        {choiceValue}
                       </span>
                       <span
                         className={`text-body-lg min-w-0 flex-1 whitespace-pre-wrap break-words font-[family-name:var(--font-body-lg)] ${
-                          isCorrectHere ? "text-amber-gold" : ""
+                          isSelected ? "text-amber-gold" : ""
                         }`}
                       >
                         {label}
                       </span>
-                      {isCorrectHere && (
-                        <span
-                          className="material-symbols-outlined text-amber-gold shrink-0"
-                          style={{ fontVariationSettings: '"FILL" 1' }}
-                          aria-hidden="true"
-                        >
-                          check_circle
-                        </span>
-                      )}
                     </button>
                   );
                 })}
@@ -513,76 +518,38 @@ export function TastingPractice() {
               <section className="space-y-3" aria-label="自由記述回答">
                 <label className="block space-y-2">
                   <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
-                    回答（問題の指示に従い、番号や短文を入力）
+                    回答（番号は ① / 1 / 一 / イ いずれでも可。短文も可）
                   </span>
                   <textarea
                     value={textAnswer}
                     onChange={(e) => setTextAnswer(e.target.value)}
-                    disabled={revealed}
                     rows={3}
                     className="dark-field text-body-lg w-full resize-y font-[family-name:var(--font-body-lg)]"
                   />
                 </label>
-                {!revealed && (
-                  <button
-                    type="button"
-                    onClick={() => reveal(textAnswer)}
-                    className="amber-cta w-full"
-                  >
-                    回答を確定
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => submitAnswer(textAnswer)}
+                  disabled={textAnswer.trim().length === 0}
+                  className="amber-cta w-full disabled:opacity-40"
+                >
+                  {answered && submittedAnswer === textAnswer.trim()
+                    ? "回答を更新済み"
+                    : answered
+                      ? "回答を更新"
+                      : "回答を確定"}
+                </button>
               </section>
             )}
 
-            {/* モバイル: 採点後インサイトを本文フローに（固定カードと重ならない） */}
-            {revealed && (
-              <aside
-                className="glass-card relative overflow-hidden rounded-xl border md:hidden"
-                aria-label="学習ノート"
+            {/* 回答済みの控えめなフィードバック（正解は明かさず、進行可能なことだけ示す） */}
+            {answered && (
+              <p
+                className="text-label-caps text-on-surface-variant text-center font-[family-name:var(--font-label-caps)]"
+                role="status"
               >
-                <div
-                  className="maturation-gradient pointer-events-none absolute inset-0 opacity-[0.05]"
-                  aria-hidden="true"
-                />
-                <div className="relative z-10 flex flex-col gap-3 p-5">
-                  <div className="text-amber-gold flex items-center gap-2">
-                    <span
-                      className="material-symbols-outlined text-[20px]"
-                      style={{ fontVariationSettings: '"FILL" 1' }}
-                      aria-hidden="true"
-                    >
-                      school
-                    </span>
-                    <span className="text-label-caps font-[family-name:var(--font-label-caps)] font-bold">
-                      マスター・ディスティラーの助言
-                    </span>
-                  </div>
-                  <p className="text-title-md font-[family-name:var(--font-title-md)]">
-                    {lastCorrect ? "正解" : "不正解"}
-                  </p>
-                  <p className="text-body-sm text-on-surface-variant leading-relaxed font-[family-name:var(--font-body-sm)]">
-                    正答:{" "}
-                    <span className="text-on-surface font-medium">
-                      {current.answer ?? "（未登録）"}
-                    </span>
-                  </p>
-                  {current.explanation ? (
-                    <p className="text-body-sm text-on-surface-variant whitespace-pre-wrap leading-relaxed font-[family-name:var(--font-body-sm)]">
-                      {current.explanation}
-                    </p>
-                  ) : (
-                    <p className="text-body-sm text-on-surface-variant leading-relaxed font-[family-name:var(--font-body-sm)]">
-                      次の問題へをタップして続行してください。
-                    </p>
-                  )}
-                  <div className="flex justify-end">
-                    <span className="text-label-caps text-outline-variant text-[10px] font-[family-name:var(--font-label-caps)]">
-                      {insightFootnote}
-                    </span>
-                  </div>
-                </div>
-              </aside>
+                回答を記録しました — 正解と解説はセッション終了後に公開されます
+              </p>
             )}
           </div>
         )}
@@ -606,6 +573,7 @@ export function TastingPractice() {
                     setPhase("setup");
                     setDeck([]);
                     answerLogRef.current = [];
+                    setSummaryAnswerLog([]);
                   }}
                   className="amber-cta-outline w-full sm:w-auto"
                 >
@@ -626,7 +594,7 @@ export function TastingPractice() {
             </h3>
             <ol className="flex list-none flex-col gap-4 p-0">
               {deck.map((q, i) => {
-                const log = answerLogRef.current[i];
+                const log = summaryAnswerLog[i];
                 const ok = log?.correct ?? false;
                 const submitted = log?.submitted ?? "";
                 const unanswered = log == null;
@@ -706,59 +674,6 @@ export function TastingPractice() {
         )}
       </main>
 
-      {/* デスクトップ: フローティング マスター・ディスティラー（Stitch aside） */}
-      {phase === "quiz" && current && revealed && (
-        <aside
-          className="border-glass-stroke bg-glass-fill pointer-events-auto fixed right-4 z-40 hidden w-full max-w-sm overflow-hidden rounded-xl border backdrop-blur-md md:bottom-10 md:right-8 md:block md:w-80"
-          style={{
-            bottom: "max(6.5rem, calc(1.5rem + env(safe-area-inset-bottom, 0px)))",
-          }}
-          aria-label="学習ノート"
-        >
-          <div
-            className="maturation-gradient pointer-events-none absolute inset-0 opacity-[0.05]"
-            aria-hidden="true"
-          />
-          <div className="relative z-10 flex max-h-[min(50dvh,calc(100dvh-14rem))] flex-col gap-3 overflow-y-auto p-6">
-            <div className="text-amber-gold flex items-center gap-2">
-              <span
-                className="material-symbols-outlined text-[20px]"
-                style={{ fontVariationSettings: '"FILL" 1' }}
-                aria-hidden="true"
-              >
-                school
-              </span>
-              <span className="text-label-caps font-[family-name:var(--font-label-caps)] font-bold">
-                マスター・ディスティラーの助言
-              </span>
-            </div>
-            <p className="text-title-md font-[family-name:var(--font-title-md)]">
-              {lastCorrect ? "正解" : "不正解"}
-            </p>
-            <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
-              正答:{" "}
-              <span className="text-on-surface font-medium">
-                {current.answer ?? "（未登録）"}
-              </span>
-            </p>
-            {current.explanation ? (
-              <p className="text-body-sm text-on-surface-variant whitespace-pre-wrap leading-relaxed font-[family-name:var(--font-body-sm)]">
-                {current.explanation}
-              </p>
-            ) : (
-              <p className="text-body-sm text-on-surface-variant leading-relaxed font-[family-name:var(--font-body-sm)]">
-                次の問題へをタップして続行してください。
-              </p>
-            )}
-            <div className="flex justify-end pt-1">
-              <span className="text-label-caps text-outline-variant text-[10px] font-[family-name:var(--font-label-caps)]">
-                {insightFootnote}
-              </span>
-            </div>
-          </div>
-        </aside>
-      )}
-
       {/* setup / summary は他ページと統一して BottomNav を表示 (md 未満のみ可視) */}
       {phase !== "quiz" && <BottomNav active="taste" />}
 
@@ -801,7 +716,7 @@ export function TastingPractice() {
               </button>
               <button
                 type="button"
-                disabled={!revealed}
+                disabled={!answered}
                 onClick={goNext}
                 className="bg-amber-gold text-cask-brown text-label-caps min-h-11 px-8 py-2.5 font-bold transition-all hover:brightness-110 disabled:opacity-40 font-[family-name:var(--font-label-caps)]"
               >

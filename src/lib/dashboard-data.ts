@@ -1,15 +1,15 @@
 import type { User } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
-// \u3053\u306e\u30e2\u30b8\u30e5\u30fc\u30eb\u306f Server Component / Route Handler \u5c02\u7528\u3002
-// browser \u3067\u4f7f\u308f\u306a\u3044\u3053\u3068\u3060\u3051\u4fdd\u8a3c\u3059\u308b (server-only \u30d1\u30c3\u30b1\u30fc\u30b8\u672a\u5c0e\u5165)\u3002
+// このモジュールは Server Component / Route Handler 専用。
+// browser で使わないことだけ保証する (server-only パッケージ未導入)。
 
 /**
- * /cellar (\u30c0\u30c3\u30b7\u30e5\u30dc\u30fc\u30c9) \u7528\u306e\u30b5\u30fc\u30d0\u30fc\u30b5\u30a4\u30c9\u96c6\u8a08\u30ed\u30fc\u30c0\u30fc
- * \u30af\u30a8\u30ea\u306f\u3059\u3079\u3066 RLS \u4e0b\u3067\u8d70\u308b (\u672c\u4eba\u306e\u30c7\u30fc\u30bf\u306e\u307f\u53d6\u5f97)\u3002
+ * /cellar (ダッシュボード) 用のサーバーサイド集計ローダー
+ * クエリはすべて RLS 下で走る (本人のデータのみ取得)。
  *
- * Supabase env \u672a\u8a2d\u5b9a / \u672a\u30ed\u30b0\u30a4\u30f3\u3060\u3068 user=null \u3067\u8fd4\u3057\u3001
- * \u753b\u9762\u5074\u3067\u300c\u7a7a\u72b6\u614b\u300d\u3092\u8868\u793a\u3059\u308b\u3002
+ * Supabase env 未設定 / 未ログインだと user=null で返し、
+ * 画面側で「空状態」を表示する。
  */
 
 export type WeakCategoryRow = {
@@ -40,6 +40,7 @@ export type DashboardSnapshot = {
   accuracy30d: number | null;
   totalAttempts: number;
   studyDays30d: number;
+  currentStreak: number;
   unresolvedWrongCount: number;
   weakCategories: WeakCategoryRow[];
   wrongNotes: WrongNoteCard[];
@@ -53,6 +54,7 @@ const EMPTY: DashboardSnapshot = {
   accuracy30d: null,
   totalAttempts: 0,
   studyDays30d: 0,
+  currentStreak: 0,
   unresolvedWrongCount: 0,
   weakCategories: [],
   wrongNotes: [],
@@ -179,6 +181,23 @@ export async function loadDashboard(): Promise<DashboardSnapshot> {
       .filter((d) => d.length > 0),
   );
 
+  // 連続学習日数 (今日を含む / 今日まだ学習してない場合は昨日から数える)
+  let currentStreak = 0;
+  {
+    const cursor = new Date();
+    for (let i = 0; i < 365; i++) {
+      const key = cursor.toISOString().slice(0, 10);
+      if (distinctDays.has(key)) {
+        currentStreak += 1;
+        cursor.setUTCDate(cursor.getUTCDate() - 1);
+      } else if (i === 0) {
+        cursor.setUTCDate(cursor.getUTCDate() - 1);
+      } else {
+        break;
+      }
+    }
+  }
+
   const accuracy30d =
     attempts30dRes.count && attempts30dRes.count > 0
       ? (correct30dRes.count ?? 0) / attempts30dRes.count
@@ -224,9 +243,11 @@ export async function loadDashboard(): Promise<DashboardSnapshot> {
     accuracy30d,
     totalAttempts: totalAttemptsRes.count ?? 0,
     studyDays30d: distinctDays.size,
+    currentStreak,
     unresolvedWrongCount: unresolvedRes.count ?? 0,
     weakCategories,
     wrongNotes,
     mySets,
   };
 }
+

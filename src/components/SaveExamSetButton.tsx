@@ -10,8 +10,8 @@ type Props = {
 
 /*
  * 「現在の生成リストを名前付きセットとして保存」する CTA + モーダル。
- * - 押下で名前入力ダイアログを開き、確定で localStorage に追加
- * - questions が 0 件のときは disabled
+ * - ログイン時: Supabase saved_question_sets へ insert（MY EXAMS / ダッシュボードと同期）
+ * - 未ログイン時: localStorage（従来どおり）
  * - 保存後は inline で「保存しました」を 2.5 秒表示
  */
 
@@ -42,12 +42,9 @@ export function SaveExamSetButton({ questions }: Props) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const disabled = !hydrated || questions.length === 0;
-
-  useEffect(() => {
-    if (!open) return;
-    setName(defaultName());
-  }, [open]);
 
   useEffect(() => {
     if (!saved) return;
@@ -55,22 +52,34 @@ export function SaveExamSetButton({ questions }: Props) {
     return () => window.clearTimeout(id);
   }, [saved]);
 
-  function handleConfirm() {
+  async function handleConfirm() {
     const trimmed = name.trim() || defaultName();
-    addSet({
-      name: trimmed,
-      questions: questions.map((q) => ({ ...q })),
-      categoryHints: topCategories(questions),
-    });
-    setOpen(false);
-    setSaved(true);
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await addSet({
+        name: trimmed,
+        questions: questions.map((q) => ({ ...q })),
+        categoryHints: topCategories(questions),
+      });
+      setOpen(false);
+      setSaved(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "保存に失敗しました");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setName(defaultName());
+          setSaveError(null);
+          setOpen(true);
+        }}
         disabled={disabled}
         className="border-amber-gold text-amber-gold hover:bg-amber-gold/10 mt-3 flex w-full items-center justify-center gap-2 rounded border px-4 py-3 font-[family-name:var(--font-label-caps)] text-[12px] tracking-[0.08em] uppercase transition-colors disabled:opacity-40"
       >
@@ -121,25 +130,35 @@ export function SaveExamSetButton({ questions }: Props) {
                 onChange={(e) => setName(e.target.value)}
                 autoFocus
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") handleConfirm();
+                  if (e.key === "Enter" && !saving) void handleConfirm();
                 }}
                 className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
               />
             </label>
+            {saveError && (
+              <p
+                role="alert"
+                className="text-body-sm text-error border-error/40 bg-error/10 mb-4 rounded border px-3 py-2 font-[family-name:var(--font-body-sm)]"
+              >
+                {saveError}
+              </p>
+            )}
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="amber-cta-outline w-full sm:w-auto"
+                disabled={saving}
+                className="amber-cta-outline w-full sm:w-auto disabled:opacity-40"
               >
                 キャンセル
               </button>
               <button
                 type="button"
-                onClick={handleConfirm}
-                className="amber-cta w-full sm:w-auto"
+                onClick={() => void handleConfirm()}
+                disabled={saving}
+                className="amber-cta w-full sm:w-auto disabled:opacity-40"
               >
-                保存
+                {saving ? "保存中…" : "保存"}
               </button>
             </div>
           </div>

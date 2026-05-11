@@ -310,6 +310,98 @@
   border-color: var(--glass-stroke);
 }
 
+/* ---------------------------------------------------------------------------
+ * 入力要素: checkbox / radio / select の統一スタイル
+ * ダークテーマ + amber-gold アクセント。
+ * .sr-only や [data-raw] が付いたものは除外して既存のチップ系UIを壊さない。
+ * --------------------------------------------------------------------------- */
+input[type="checkbox"]:not(.sr-only):not([data-raw]),
+input[type="radio"]:not(.sr-only):not([data-raw]) {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 1.5px solid var(--outline);
+  background: transparent;
+  display: inline-grid;
+  place-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  margin: 0;
+  transition:
+    background-color 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+input[type="checkbox"]:not(.sr-only):not([data-raw]) {
+  border-radius: 4px;
+}
+input[type="radio"]:not(.sr-only):not([data-raw]) {
+  border-radius: 9999px;
+}
+input[type="checkbox"]:not(.sr-only):not([data-raw]):hover,
+input[type="radio"]:not(.sr-only):not([data-raw]):hover {
+  border-color: var(--amber-gold);
+}
+input[type="checkbox"]:not(.sr-only):not([data-raw]):checked,
+input[type="radio"]:not(.sr-only):not([data-raw]):checked {
+  background: var(--amber-gold);
+  border-color: var(--amber-gold);
+}
+input[type="checkbox"]:not(.sr-only):not([data-raw]):disabled,
+input[type="radio"]:not(.sr-only):not([data-raw]):disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+/* check mark (checkbox 内側) */
+input[type="checkbox"]:not(.sr-only):not([data-raw])::before {
+  content: "";
+  width: 0.625rem;
+  height: 0.625rem;
+  background: var(--cask-brown);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+input[type="checkbox"]:not(.sr-only):not([data-raw]):checked::before {
+  transform: scale(1);
+}
+/* dot (radio 内側) */
+input[type="radio"]:not(.sr-only):not([data-raw])::before {
+  content: "";
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: var(--cask-brown);
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+input[type="radio"]:not(.sr-only):not([data-raw]):checked::before {
+  transform: scale(1);
+}
+input[type="checkbox"]:not(.sr-only):not([data-raw]):focus-visible,
+input[type="radio"]:not(.sr-only):not([data-raw]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 191, 0, 0.35);
+}
+
+/* select.dark-field: ネイティブ矢印を消して amber chevron を描く */
+select.dark-field {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23FFBF00' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2.5 4.5L6 8l3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 0.75rem 0.75rem;
+  padding-right: 2.25rem;
+  cursor: pointer;
+}
+select.dark-field option {
+  color: var(--on-surface);
+  background: var(--surface-charcoal);
+}
+
 /* センソリーパレット用の同心円とレーダー */
 .flavor-ring {
   border: 1px solid rgba(255, 191, 0, 0.15);

@@ -86,11 +86,11 @@ export function UserAvatarMenu() {
               Signed in
             </p>
           </div>
-          <MenuLink href="/profile" icon="account_circle" onClick={close}>
-            Profile
-          </MenuLink>
           <MenuLink href="/sets" icon="bookmarks" onClick={close}>
-            My sets
+            マイ EXAMS
+          </MenuLink>
+          <MenuLink href="/analytics" icon="query_stats" onClick={close}>
+            アナリティクス
           </MenuLink>
 
           <form

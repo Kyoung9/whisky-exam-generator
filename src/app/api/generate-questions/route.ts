@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { callJsonChatWithOptionalReview } from "@/lib/ai-question-pipeline";
-import { getFilteredPastQuestions } from "@/lib/exams";
+import { getFilteredPastQuestions, pickRandomMapAnchor } from "@/lib/exams";
 import { buildGeneratePrompt } from "@/lib/prompts";
 import {
   aiResponseSchema,
@@ -35,6 +35,24 @@ export async function POST(req: Request) {
 
   const { years, categories, types, count, difficulty, includeExplanation } = parsed.data;
 
+  const typesArr = types as QuestionType[];
+  const wantsMap = typesArr.includes("map");
+  const mapAnchor = wantsMap
+    ? pickRandomMapAnchor({
+        years: years as ExamYear[],
+        categories: categories as Category[],
+      })
+    : null;
+  if (wantsMap && !mapAnchor) {
+    return NextResponse.json(
+      {
+        error:
+          "選択した条件に合う、画像付きの過去の地図問題がありません。年度やカテゴリを変えてください。",
+      },
+      { status: 422 },
+    );
+  }
+
   const pastQuestions = getFilteredPastQuestions({
     years: years as ExamYear[],
     categories: categories as Category[],
@@ -45,10 +63,11 @@ export async function POST(req: Request) {
   const { system, user } = buildGeneratePrompt({
     pastQuestions,
     categories: categories as Category[],
-    types: types as QuestionType[],
+    types: typesArr,
     count,
     difficulty: difficulty as Difficulty,
     includeExplanation,
+    mapAnchor: wantsMap ? mapAnchor : undefined,
   });
 
   let raw: unknown;
@@ -67,6 +86,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const questions = toGeneratedQuestions(aiParsed.data);
+  const questions = toGeneratedQuestions(aiParsed.data, {
+    mapImageFrom:
+      wantsMap && mapAnchor?.imageRef
+        ? {
+            imageRef: mapAnchor.imageRef,
+            imageSourcePage: mapAnchor.imageSourcePage,
+            imageDescription: mapAnchor.imageDescription,
+          }
+        : undefined,
+  });
   return NextResponse.json({ questions });
 }

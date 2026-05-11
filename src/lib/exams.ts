@@ -53,3 +53,75 @@ export function getFilteredPastQuestions(input: {
   }
   return filtered;
 }
+
+// 画像付きの過去 map 問題（生成時に同一図版を再利用するため）
+export function getPastMapQuestionsWithImage(input: {
+  years: ExamYear[];
+  categories?: Category[];
+}): PastExamQuestion[] {
+  const all = input.years.flatMap((y) => getQuestionsByYear(y));
+  return all.filter((q) => {
+    if (isPlaceholder(q)) return false;
+    if (q.type !== "map") return false;
+    if (!q.imageRef) return false;
+    if (input.categories && input.categories.length > 0) {
+      if (!input.categories.includes(q.category)) return false;
+    }
+    return true;
+  });
+}
+
+export function pickRandomMapAnchor(input: {
+  years: ExamYear[];
+  categories?: Category[];
+}): PastExamQuestion | null {
+  const pool = getPastMapQuestionsWithImage(input);
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)]!;
+}
+
+function shuffleInPlace<T>(arr: T[]): void {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j]!, arr[i]!];
+  }
+}
+
+// テーマ生成用: カテゴリごとに均等に近い件数をサンプルし、偏りを抑える
+export function stratifiedSamplePastQuestions(
+  pool: PastExamQuestion[],
+  n: number
+): PastExamQuestion[] {
+  if (n <= 0 || pool.length === 0) return [];
+  const cap = Math.min(n, pool.length);
+  if (cap === pool.length) return [...pool];
+
+  const strata = new Map<string, PastExamQuestion[]>();
+  for (const q of pool) {
+    const key = q.category;
+    const bucket = strata.get(key) ?? [];
+    bucket.push(q);
+    strata.set(key, bucket);
+  }
+  for (const list of strata.values()) {
+    shuffleInPlace(list);
+  }
+
+  const keys = [...strata.keys()];
+  const out: PastExamQuestion[] = [];
+  let round = 0;
+  while (out.length < cap) {
+    let added = false;
+    for (const k of keys) {
+      if (out.length >= cap) break;
+      const list = strata.get(k)!;
+      if (round < list.length) {
+        out.push(list[round]!);
+        added = true;
+      }
+    }
+    if (!added) break;
+    round++;
+  }
+  return out;
+}

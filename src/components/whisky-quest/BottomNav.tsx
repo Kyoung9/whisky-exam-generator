@@ -11,7 +11,7 @@ export type NavTabKey =
   | "distill"
   | "taste"
   | "archive"
-  | "profile";
+  | "analytics";
 
 type NavTab = {
   key: NavTabKey;
@@ -20,11 +20,12 @@ type NavTab = {
   href?: string;
 };
 
-// 直感ラベル: メタファ (蒸留 / セラー / テイスティング / アーカイブ) を機能名に変更
+// 役割でタブを分離: ダッシュボード=今日の進捗, アナリティクス=深い分析,
+// アカウント設定/マイ EXAMS は右上アバターメニューに集約。
 const NAV_TABS: NavTab[] = [
   {
     key: "cellar",
-    icon: "inventory_2",
+    icon: "today",
     label: "ダッシュボード",
     href: "/cellar",
   },
@@ -37,10 +38,10 @@ const NAV_TABS: NavTab[] = [
     href: "/archive",
   },
   {
-    key: "profile",
-    icon: "analytics",
-    label: "プロフィール",
-    href: "/profile",
+    key: "analytics",
+    icon: "query_stats",
+    label: "アナリティクス",
+    href: "/analytics",
   },
 ];
 

@@ -17,6 +17,7 @@ export function pastQuestionToPractice(q: PastExamQuestion): PracticeItem {
   return {
     id: `past:${q.id}`,
     source: "past",
+    category: q.category,
     year: q.year,
     body: q.body,
     choices: q.choices,
@@ -32,6 +33,7 @@ export function generatedQuestionToPractice(q: GeneratedQuestion): PracticeItem 
   return {
     id: `gen:${q.id}`,
     source: "generated",
+    category: q.category,
     body: q.body,
     choices: q.choices,
     answer: q.answer,

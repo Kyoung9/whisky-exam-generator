@@ -24,7 +24,7 @@ const HEADER_TABS: { key: NavTabKey; label: string; href: string }[] = [
   { key: "distill", label: "問題生成", href: "/generate" },
   { key: "taste", label: "模擬試験", href: "/tasting" },
   { key: "archive", label: "過去問", href: "/archive" },
-  { key: "profile", label: "プロフィール", href: "/profile" },
+  { key: "analytics", label: "アナリティクス", href: "/analytics" },
 ];
 
 export function AppHeader({

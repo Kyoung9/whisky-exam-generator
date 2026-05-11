@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useState } from "react";
 import { GenerateForm } from "@/components/GenerateForm";
@@ -12,6 +13,12 @@ import { AppHeader } from "@/components/whisky-quest/AppHeader";
 import { BottomNav } from "@/components/whisky-quest/BottomNav";
 import { QuestionsProvider, useQuestions } from "@/lib/store";
 import type { GeneratedQuestion } from "@/types/question";
+
+const PdfPreviewModal = dynamic(
+  () =>
+    import("@/components/PdfPreviewModal").then((m) => m.PdfPreviewModal),
+  { ssr: false },
+);
 
 /*
  * /generate = WhiskyQuest「蒸留 (予想問題ジェネレーター)」画面
@@ -26,6 +33,7 @@ function GenerateInner() {
   const { append, appendAfter, hydrated, questions } = useQuestions();
   const [similarSource, setSimilarSource] =
     useState<GeneratedQuestion | null>(null);
+  const [pdfPreviewOpen, setPdfPreviewOpen] = useState(false);
 
   const total = questions.length;
   const selected = questions.filter((q) => q.selected).length;
@@ -137,7 +145,10 @@ function GenerateInner() {
               <div className="border-glass-stroke border-t pt-6">
                 {hydrated ? (
                   <>
-                    <PdfDownloadButton questions={questions} />
+                    <PdfDownloadButton
+                      questions={questions}
+                      onOpen={() => setPdfPreviewOpen(true)}
+                    />
                     <SaveExamSetButton questions={questions} />
                   </>
                 ) : (
@@ -182,6 +193,13 @@ function GenerateInner() {
           source={similarSource}
           onClose={() => setSimilarSource(null)}
           onGenerated={(qs) => appendAfter(similarSource.id, qs)}
+        />
+      )}
+
+      {pdfPreviewOpen && (
+        <PdfPreviewModal
+          questions={questions}
+          onClose={() => setPdfPreviewOpen(false)}
         />
       )}
     </div>
