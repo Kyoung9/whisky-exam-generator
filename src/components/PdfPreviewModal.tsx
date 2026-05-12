@@ -225,7 +225,6 @@ export function PdfPreviewModal({ questions, onClose }: Props) {
                           height: "100%",
                           minHeight: 0,
                           border: "none",
-                          display: "block",
                         }}
                         showToolbar={false}
                       >
