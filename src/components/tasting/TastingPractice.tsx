@@ -777,20 +777,19 @@ export function TastingPractice() {
                         {q.body}
                       </p>
                       {q.choices && q.choices.length > 0 && (
-                        <div className="border-glass-stroke bg-surface-container-low/30 mb-4 rounded-lg border px-3 py-2">
+                        <div className="border-glass-stroke bg-surface-container-low/30 mb-4 min-w-0 rounded-lg border px-3 py-2">
                           <p className="text-label-caps text-on-surface-variant mb-2 font-[family-name:var(--font-label-caps)]">
                             選択肢
                           </p>
                           <ul className="text-body-sm text-on-surface-variant m-0 list-none space-y-1.5 p-0 font-[family-name:var(--font-body-sm)]">
                             {q.choices.map((label, ci) => (
-                              <li
-                                key={ci}
-                                className="flex gap-2 break-words whitespace-pre-wrap"
-                              >
+                              <li key={ci} className="flex gap-2">
                                 <span className="text-amber-gold shrink-0 font-medium">
                                   {choiceLabel(ci)}
                                 </span>
-                                <span>{label}</span>
+                                <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
+                                  {label}
+                                </span>
                               </li>
                             ))}
                           </ul>
