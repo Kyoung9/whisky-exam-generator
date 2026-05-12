@@ -66,6 +66,43 @@ export function normalizeAnswerText(s: string): string {
     .replace(/\s+/g, " ");
 }
 
+/** UI 用の丸数字ラベル（TastingPractice の choiceLabel と同順） */
+const CIRCLED_CHOICE_LABELS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳";
+
+function choiceIndexLabel(i: number): string {
+  return CIRCLED_CHOICE_LABELS[i] ?? `(${i + 1})`;
+}
+
+/**
+ * 演習サマリー用: 解答が番号（① / 1 / 漢数字 等）で特定できるとき、
+ * 「丸数字 + 選択肢本文」を返す。選択肢がない／解決できないときは trim 済み原文。
+ */
+export function formatPracticeAnswerDisplay(
+  answerRaw: string,
+  choices: string[] | undefined,
+): string {
+  const trimmed = answerRaw.trim();
+  if (!choices?.length || trimmed === "") return trimmed;
+
+  const normalized = normalizeAnswerText(trimmed).replace(/\s/g, "");
+
+  if (/^\d+$/.test(normalized)) {
+    const idx = parseInt(normalized, 10) - 1;
+    if (idx >= 0 && idx < choices.length) {
+      return `${choiceIndexLabel(idx)} ${choices[idx]}`;
+    }
+  }
+
+  for (let i = 0; i < choices.length; i++) {
+    const choiceNorm = normalizeAnswerText(choices[i]).replace(/\s/g, "");
+    if (choiceNorm === normalized) {
+      return `${choiceIndexLabel(i)} ${choices[i]}`;
+    }
+  }
+
+  return trimmed;
+}
+
 /** 演習の正誤判定（過去問の「番号を答えよ」形式と生成問題の短文に対応） */
 export function gradePracticeAnswer(
   userRaw: string,

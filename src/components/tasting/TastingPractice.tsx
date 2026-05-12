@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadExamSets } from "@/lib/exam-set-storage";
-import { gradePracticeAnswer } from "@/lib/practice-grade";
+import {
+  formatPracticeAnswerDisplay,
+  gradePracticeAnswer,
+} from "@/lib/practice-grade";
 import {
   buildPracticeDeck,
   buildPracticeDeckFromSavedQuestions,
@@ -773,17 +776,46 @@ export function TastingPractice() {
                       <p className="text-body-sm text-on-surface mb-4 whitespace-pre-wrap font-[family-name:var(--font-body-sm)] leading-relaxed">
                         {q.body}
                       </p>
+                      {q.choices && q.choices.length > 0 && (
+                        <div className="border-glass-stroke bg-surface-container-low/30 mb-4 rounded-lg border px-3 py-2">
+                          <p className="text-label-caps text-on-surface-variant mb-2 font-[family-name:var(--font-label-caps)]">
+                            選択肢
+                          </p>
+                          <ul className="text-body-sm text-on-surface-variant m-0 list-none space-y-1.5 p-0 font-[family-name:var(--font-body-sm)]">
+                            {q.choices.map((label, ci) => (
+                              <li
+                                key={ci}
+                                className="flex gap-2 break-words whitespace-pre-wrap"
+                              >
+                                <span className="text-amber-gold shrink-0 font-medium">
+                                  {choiceLabel(ci)}
+                                </span>
+                                <span>{label}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                       <dl className="text-body-sm space-y-2 font-[family-name:var(--font-body-sm)]">
                         <div className="flex flex-wrap gap-x-2 gap-y-1">
                           <dt className="text-on-surface-variant shrink-0">あなたの回答</dt>
                           <dd className="text-on-surface min-w-0 break-words font-medium">
-                            {unanswered ? "—" : submitted || "（空）"}
+                            {unanswered
+                              ? "—"
+                              : submitted === ""
+                                ? "（空）"
+                                : formatPracticeAnswerDisplay(
+                                    submitted,
+                                    q.choices,
+                                  )}
                           </dd>
                         </div>
                         <div className="flex flex-wrap gap-x-2 gap-y-1">
                           <dt className="text-on-surface-variant shrink-0">正答</dt>
                           <dd className="text-amber-gold min-w-0 break-words font-medium">
-                            {q.answer ?? "（未登録）"}
+                            {q.answer == null || q.answer === ""
+                              ? "（未登録）"
+                              : formatPracticeAnswerDisplay(q.answer, q.choices)}
                           </dd>
                         </div>
                       </dl>

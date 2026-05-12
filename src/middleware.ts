@@ -6,6 +6,20 @@ import { type NextRequest, NextResponse } from "next/server";
  * 認可ロジックは RLS に任せ、ここでは getUser のみ
  */
 export async function middleware(request: NextRequest) {
+  const nextUrl = request.nextUrl;
+  // Supabase の Redirect URLs に /auth/callback が無いと Site URL（多くは /）へ ?code= だけ付いて戻る。
+  // その場合でもセッション交換できるよう callback へ寄せる。
+  if (
+    nextUrl.pathname !== "/auth/callback" &&
+    nextUrl.searchParams.has("code")
+  ) {
+    const callback = new URL("/auth/callback", request.url);
+    nextUrl.searchParams.forEach((value, key) => {
+      callback.searchParams.set(key, value);
+    });
+    return NextResponse.redirect(callback);
+  }
+
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

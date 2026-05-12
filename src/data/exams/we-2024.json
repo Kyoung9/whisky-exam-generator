@@ -536,7 +536,7 @@
     "number": 23,
     "subNumber": "a",
     "answer": "10",
-    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nA. ローランドのウィグタウンにある蒸留所で、ここがスコッチ最南端となっている。\n【選択肢】① Annandale ② Roseisle ③ Inchgower ④ Glendronach ⑤ Glenfarclas ⑥ Mortlach ⑦ Abhainn Dearg ⑧ Ladyburn ⑨ Ardmore ⑩ Balblair ⑪ Bladnoch ⑫ Knockdhu ⑬ Aberlour ⑭ Speyburn",
+    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nA. ローランドのウィグタウンにある蒸留所で、ここがスコッチ最南端となっている。",
     "choices": [
       "Annandale",
       "Roseisle",
@@ -547,11 +547,11 @@
       "Abhainn Dearg",
       "Ladyburn",
       "Ardmore",
-      "Balblair",
       "Bladnoch",
+      "Balblair",
+      "Speyburn",
       "Knockdhu",
-      "Aberlour",
-      "Speyburn"
+      "Aberlour"
     ],
     "type": "multiple_choice",
     "theme": "蒸留所の特徴と所在地の対応",
@@ -564,7 +564,7 @@
     "number": 23,
     "subNumber": "b",
     "answer": "5",
-    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nB. スペイサイドのベンリネス山の麓に位置する蒸留所で、今でもガス直火焚き蒸留を行っている。\n【選択肢】① Annandale ② Roseisle ③ Inchgower ④ Glendronach ⑤ Glenfarclas ⑥ Mortlach ⑦ Abhainn Dearg ⑧ Ladyburn ⑨ Ardmore ⑩ Balblair ⑪ Bladnoch ⑫ Knockdhu ⑬ Aberlour ⑭ Speyburn",
+    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nB. スペイサイドのベンリネス山の麓に位置する蒸留所で、今でもガス直火焚き蒸留を行っている。",
     "choices": [
       "Annandale",
       "Roseisle",
@@ -575,11 +575,11 @@
       "Abhainn Dearg",
       "Ladyburn",
       "Ardmore",
-      "Balblair",
       "Bladnoch",
+      "Balblair",
+      "Speyburn",
       "Knockdhu",
-      "Aberlour",
-      "Speyburn"
+      "Aberlour"
     ],
     "type": "multiple_choice",
     "theme": "蒸留所の特徴と所在地の対応",
@@ -592,7 +592,7 @@
     "number": 23,
     "subNumber": "c",
     "answer": "9",
-    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nC. ハイランドのケネスモントに所在する蒸留所で、ティーチャーズの原酒を造る蒸留所として有名。\n【選択肢】① Annandale ② Roseisle ③ Inchgower ④ Glendronach ⑤ Glenfarclas ⑥ Mortlach ⑦ Abhainn Dearg ⑧ Ladyburn ⑨ Ardmore ⑩ Balblair ⑪ Bladnoch ⑫ Knockdhu ⑬ Aberlour ⑭ Speyburn",
+    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nC. ハイランドのケネスモントに所在する蒸留所で、ティーチャーズの原酒を造る蒸留所として有名。",
     "choices": [
       "Annandale",
       "Roseisle",
@@ -603,11 +603,11 @@
       "Abhainn Dearg",
       "Ladyburn",
       "Ardmore",
-      "Balblair",
       "Bladnoch",
+      "Balblair",
+      "Speyburn",
       "Knockdhu",
-      "Aberlour",
-      "Speyburn"
+      "Aberlour"
     ],
     "type": "multiple_choice",
     "theme": "蒸留所の特徴と所在地の対応",
@@ -620,7 +620,7 @@
     "number": 23,
     "subNumber": "d",
     "answer": "13",
-    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nD. 蒸留所名とブランド名が異なる蒸留所の1つで、オフィシャルのシングルモルトは「アノック」のブランド名でリリースされている。\n【選択肢】① Annandale ② Roseisle ③ Inchgower ④ Glendronach ⑤ Glenfarclas ⑥ Mortlach ⑦ Abhainn Dearg ⑧ Ladyburn ⑨ Ardmore ⑩ Balblair ⑪ Bladnoch ⑫ Knockdhu ⑬ Aberlour ⑭ Speyburn",
+    "body": "次の文章を読んで、それぞれに当てはまる蒸留所を下から1つ選んで、その番号を答えなさい。\nD. 蒸留所名とブランド名が異なる蒸留所の1つで、オフィシャルのシングルモルトは「アノック」のブランド名でリリースされている",
     "choices": [
       "Annandale",
       "Roseisle",
@@ -631,11 +631,12 @@
       "Abhainn Dearg",
       "Ladyburn",
       "Ardmore",
-      "Balblair",
       "Bladnoch",
+      "Balblair",
+      "Speyburn",
       "Knockdhu",
-      "Aberlour",
-      "Speyburn"
+      "Aberlour"
+      
     ],
     "type": "multiple_choice",
     "theme": "蒸留所の特徴と所在地の対応",
