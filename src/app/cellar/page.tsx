@@ -204,7 +204,7 @@ function NextActionCard({
     kicker = "今日の優先";
     title = `未解決の誤答ノートが ${unresolved} 件`;
     body = "間違えた問題を復習して、確実に解決済みにしましょう。";
-    primaryHref = "/tasting";
+    primaryHref = "/tasting?retry=wrong";
     primaryLabel = "復習を始める";
     secondary = weakest
       ? {
@@ -333,10 +333,10 @@ function WrongNotesPanel({ notes }: { notes: WrongNoteCard[] }) {
           </h2>
         </div>
         <Link
-          href="/tasting"
+          href="/tasting?retry=wrong"
           className="text-label-caps text-amber-gold/70 hover:text-amber-gold font-[family-name:var(--font-label-caps)] text-[10px] underline-offset-4 hover:underline"
         >
-          模擬試験へ
+          誤答復習へ
         </Link>
       </header>
 
@@ -415,7 +415,7 @@ function MySetsPanel({ sets }: { sets: SetCard[] }) {
           {sets.map((set) => (
             <li key={set.id}>
               <Link
-                href="/sets"
+                href={`/sets/${encodeURIComponent(set.id)}`}
                 className="border-glass-stroke hover:bg-amber-gold/5 hover:border-amber-gold/40 flex items-baseline justify-between gap-2 rounded-lg border p-3 transition-colors"
               >
                 <span className="text-body-sm text-on-surface min-w-0 truncate font-medium font-[family-name:var(--font-body-sm)]">

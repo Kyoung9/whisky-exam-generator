@@ -645,7 +645,7 @@ function ContextCard({
         </li>
         <li>
           <Link
-            href="/tasting"
+            href={unresolved > 0 ? "/tasting?retry=wrong" : "/tasting"}
             className="border-glass-stroke hover:border-amber-gold/40 hover:bg-amber-gold/5 flex items-center justify-between gap-2 rounded-lg border p-3 transition-colors"
           >
             <span className="text-body-sm text-on-surface font-[family-name:var(--font-body-sm)]">

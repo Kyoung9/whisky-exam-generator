@@ -1,7 +1,12 @@
 import type { QuestionType } from "@/types/question";
 
 /** テイスティング画面の出題ソース */
-export type PracticeSourceMode = "past" | "generated" | "mix" | "saved_set";
+export type PracticeSourceMode =
+  | "past"
+  | "generated"
+  | "mix"
+  | "saved_set"
+  | "wrong_notes";
 
 /** 1 問分の演習用データ（過去問または生成問題を正規化） */
 export type PracticeItem = {
@@ -17,4 +22,6 @@ export type PracticeItem = {
   type: QuestionType;
   imageRef?: string;
   imageDescription?: string;
+  /** 誤答ノート復習時: wrong_answer_notes.id（正解で resolved にする） */
+  wrongNoteId?: string;
 };

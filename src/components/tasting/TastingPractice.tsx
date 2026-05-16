@@ -2,7 +2,15 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MutableRefObject,
+} from "react";
+import { CollapsibleFilterCard } from "@/components/CollapsibleFilterCard";
 import { loadExamSets } from "@/lib/exam-set-storage";
 import {
   formatPracticeAnswerDisplay,
@@ -12,16 +20,25 @@ import {
 import {
   buildPracticeDeck,
   buildPracticeDeckFromSavedQuestions,
+  buildPracticeDeckFromWrongNotes,
 } from "@/lib/practice-pool";
 import { fetchSavedSetById } from "@/lib/supabase/saved-sets-client";
+import {
+  fetchUnresolvedWrongNotes,
+  markWrongNoteResolved,
+} from "@/lib/supabase/wrong-notes-client";
 import { useUser } from "@/lib/supabase/use-user";
 import { useQuestions } from "@/lib/store";
 import type { ExamSet } from "@/types/exam-set";
 import type { PracticeItem, PracticeSourceMode } from "@/types/practice";
 import {
+  CATEGORIES,
   EXAM_YEARS,
+  QUESTION_TYPES,
   QUESTION_TYPE_LABELS,
+  type Category,
   type ExamYear,
+  type QuestionType,
 } from "@/types/question";
 import { AppHeader } from "@/components/whisky-quest/AppHeader";
 import { BottomNav } from "@/components/whisky-quest/BottomNav";
@@ -40,6 +57,73 @@ type AnswerEntry = { submitted: string; correct: boolean };
 
 function toggleYear(arr: ExamYear[], y: ExamYear): ExamYear[] {
   return arr.includes(y) ? arr.filter((x) => x !== y) : [...arr, y].sort((a, b) => a - b);
+}
+
+function toggle<T>(arr: T[], value: T): T[] {
+  return arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
+}
+
+function filterSummary(selected: number, total: number): string {
+  if (selected === 0) return "未選択";
+  if (selected === total) return "全選択";
+  return `${selected} / ${total}`;
+}
+
+function chipClass(active: boolean): string {
+  return [
+    "text-label-caps cursor-pointer rounded-full border px-4 py-2 font-[family-name:var(--font-label-caps)] transition-all",
+    active
+      ? "border-amber-gold bg-amber-gold text-cask-brown"
+      : "border-glass-stroke text-on-surface-variant hover:border-amber-gold hover:text-amber-gold",
+  ].join(" ");
+}
+
+function parseYearsParam(raw: string | null): ExamYear[] | null {
+  if (!raw?.trim()) return null;
+  const parsed = raw
+    .split(",")
+    .map((s) => Number(s.trim()))
+    .filter((y): y is ExamYear =>
+      EXAM_YEARS.includes(y as ExamYear),
+    );
+  return parsed.length > 0 ? parsed : null;
+}
+
+function beginQuizSession(
+  deckBuilt: PracticeItem[],
+  reset: {
+    setDeck: (d: PracticeItem[]) => void;
+    setSummaryAnswerLog: (l: (AnswerEntry | undefined)[]) => void;
+    answerLogRef: MutableRefObject<(AnswerEntry | undefined)[]>;
+    setFlagged: (s: Set<number>) => void;
+    setIndex: (i: number) => void;
+    setTextAnswer: (s: string) => void;
+    setAnswered: (b: boolean) => void;
+    setSubmittedAnswer: (s: string) => void;
+    setResults: (r: boolean[]) => void;
+    setElapsed: (n: number) => void;
+    setPhase: (p: Phase) => void;
+    sessionIdRef: MutableRefObject<string | null>;
+  },
+) {
+  reset.sessionIdRef.current =
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+      ? crypto.randomUUID()
+      : `sess_${Date.now()}`;
+  reset.setSummaryAnswerLog([]);
+  reset.setDeck(deckBuilt);
+  reset.answerLogRef.current = Array.from(
+    { length: deckBuilt.length },
+    () => undefined,
+  );
+  reset.setFlagged(new Set());
+  reset.setIndex(0);
+  reset.setTextAnswer("");
+  reset.setAnswered(false);
+  reset.setSubmittedAnswer("");
+  reset.setResults([]);
+  reset.setElapsed(0);
+  reset.setPhase("quiz");
 }
 
 function formatElapsed(totalSec: number): string {
@@ -61,14 +145,25 @@ function choiceLabel(i: number): string {
 export function TastingPractice() {
   const searchParams = useSearchParams();
   const practiceSetId = searchParams.get("practiceSet");
+  const retryWrong = searchParams.get("retry") === "wrong";
+  const yearsParam = searchParams.get("years");
   const { user, loading: userLoading } = useUser();
   const { questions: generatedList, hydrated } = useQuestions();
 
   const [phase, setPhase] = useState<Phase>("setup");
-  const [mode, setMode] = useState<PracticeSourceMode>("mix");
-  const [years, setYears] = useState<ExamYear[]>([...EXAM_YEARS]);
+  const [mode, setMode] = useState<PracticeSourceMode>(
+    retryWrong ? "wrong_notes" : "mix",
+  );
+  const [years, setYears] = useState<ExamYear[]>(() => {
+    const parsed = parseYearsParam(yearsParam);
+    return parsed ?? [...EXAM_YEARS];
+  });
+  const [categories, setCategories] = useState<Category[]>([...CATEGORIES]);
+  const [types, setTypes] = useState<QuestionType[]>([...QUESTION_TYPES]);
   const [count, setCount] = useState(10);
   const [shuffle, setShuffle] = useState(true);
+  const [wrongNotesDeck, setWrongNotesDeck] = useState<PracticeItem[]>([]);
+  const [wrongNotesLoading, setWrongNotesLoading] = useState(false);
   const [deck, setDeck] = useState<PracticeItem[]>([]);
   /** 前後の問題へ移るとき setState の反映遅れを避けるため ref と同期 */
   const answerLogRef = useRef<(AnswerEntry | undefined)[]>([]);
@@ -119,6 +214,53 @@ export function TastingPractice() {
   }, [phase]);
 
   useEffect(() => {
+    const parsed = parseYearsParam(yearsParam);
+    if (parsed) setYears(parsed);
+  }, [yearsParam]);
+
+  useEffect(() => {
+    if (retryWrong) setMode("wrong_notes");
+  }, [retryWrong]);
+
+  useEffect(() => {
+    if (!retryWrong || userLoading) return;
+    if (!user) {
+      setWrongNotesDeck([]);
+      setWrongNotesLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setWrongNotesLoading(true);
+    void (async () => {
+      const notes = await fetchUnresolvedWrongNotes();
+      if (cancelled) return;
+      setWrongNotesDeck(buildPracticeDeckFromWrongNotes(notes, { shuffle: true }));
+      setWrongNotesLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [retryWrong, user, userLoading]);
+
+  const sessionReset = useMemo(
+    () => ({
+      setDeck,
+      setSummaryAnswerLog,
+      answerLogRef,
+      setFlagged,
+      setIndex,
+      setTextAnswer,
+      setAnswered,
+      setSubmittedAnswer,
+      setResults,
+      setElapsed,
+      setPhase,
+      sessionIdRef,
+    }),
+    [],
+  );
+
+  useEffect(() => {
     if (!practiceSetId) {
       queueMicrotask(() => {
         setSavedSetBuffer([]);
@@ -161,6 +303,18 @@ export function TastingPractice() {
 
   const startSession = useCallback(() => {
     setSetupError(null);
+    if (mode === "wrong_notes") {
+      if (!user) {
+        setSetupError("誤答ノートの復習にはログインが必要です。");
+        return;
+      }
+      if (wrongNotesDeck.length === 0) {
+        setSetupError("未解決の誤答がありません。");
+        return;
+      }
+      beginQuizSession(wrongNotesDeck, sessionReset);
+      return;
+    }
     if (mode === "saved_set") {
       if (savedSetBuffer.length === 0) {
         setSetupError(
@@ -177,25 +331,11 @@ export function TastingPractice() {
         setSetupError("出題できる問題がありません。");
         return;
       }
-      sessionIdRef.current =
-        typeof crypto !== "undefined" &&
-        typeof crypto.randomUUID === "function"
-          ? crypto.randomUUID()
-          : `sess_${Date.now()}`;
-      setSummaryAnswerLog([]);
-      setDeck(deckBuilt);
-      answerLogRef.current = Array.from(
-        { length: deckBuilt.length },
-        () => undefined,
-      );
-      setFlagged(new Set());
-      setIndex(0);
-      setTextAnswer("");
-      setAnswered(false);
-      setSubmittedAnswer("");
-      setResults([]);
-      setElapsed(0);
-      setPhase("quiz");
+      beginQuizSession(deckBuilt, sessionReset);
+      return;
+    }
+    if (categories.length === 0 || types.length === 0) {
+      setSetupError("詳細オプションでカテゴリと問題タイプを 1 つ以上選んでください。");
       return;
     }
     if (mode === "generated" && generatedList.length === 0) {
@@ -212,30 +352,29 @@ export function TastingPractice() {
       generatedQuestions: mode === "past" ? [] : generatedList,
       count: Math.min(50, Math.max(1, count)),
       shuffle,
+      categories,
+      types,
     });
     if (deckBuilt.length === 0) {
       setSetupError(
-        "出題できる問題がありません。年度・ソースを変えるか、生成問題を追加してください。",
+        "出題できる問題がありません。年度・ソース・詳細オプションを変えるか、生成問題を追加してください。",
       );
       return;
     }
-    sessionIdRef.current =
-      typeof crypto !== "undefined" &&
-      typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `sess_${Date.now()}`;
-    setSummaryAnswerLog([]);
-    setDeck(deckBuilt);
-    answerLogRef.current = Array.from({ length: deckBuilt.length }, () => undefined);
-    setFlagged(new Set());
-    setIndex(0);
-    setTextAnswer("");
-    setAnswered(false);
-    setSubmittedAnswer("");
-    setResults([]);
-    setElapsed(0);
-    setPhase("quiz");
-  }, [mode, years, count, shuffle, generatedList, savedSetBuffer]);
+    beginQuizSession(deckBuilt, sessionReset);
+  }, [
+    mode,
+    years,
+    categories,
+    types,
+    count,
+    shuffle,
+    generatedList,
+    savedSetBuffer,
+    wrongNotesDeck,
+    user,
+    sessionReset,
+  ]);
 
   /**
    * 回答の確定。正誤は内部的に記録するだけで、ここでは UI に正解/解説を出さない。
@@ -254,6 +393,9 @@ export function TastingPractice() {
         return next;
       });
       answerLogRef.current[index] = { submitted: trimmed, correct: ok };
+      if (ok && current.wrongNoteId) {
+        void markWrongNoteResolved(current.wrongNoteId);
+      }
     },
     [current, index],
   );
@@ -312,7 +454,34 @@ export function TastingPractice() {
     [results],
   );
 
+  const wrongCountInSummary = useMemo(
+    () => summaryAnswerLog.filter((l) => l && !l.correct).length,
+    [summaryAnswerLog],
+  );
+
+  const retryWrongInSession = useCallback(() => {
+    const wrongItems = deck.filter((_, i) => {
+      const log = summaryAnswerLog[i];
+      return log != null && !log.correct;
+    });
+    if (wrongItems.length === 0) return;
+    beginQuizSession(wrongItems, sessionReset);
+  }, [deck, summaryAnswerLog, sessionReset]);
+
   const allYearsChecked = years.length === EXAM_YEARS.length;
+  const allCategoriesChecked = categories.length === CATEGORIES.length;
+  const allTypesChecked = types.length === QUESTION_TYPES.length;
+  const showAdvancedFilters =
+    mode !== "saved_set" && mode !== "wrong_notes";
+  const filtersValid = categories.length > 0 && types.length > 0;
+  const canStart =
+    mode === "saved_set"
+      ? savedSetBuffer.length > 0
+      : mode === "wrong_notes"
+        ? Boolean(user) && !wrongNotesLoading && wrongNotesDeck.length > 0
+        : hydrated &&
+          filtersValid &&
+          (mode !== "past" || years.length > 0);
 
   return (
     <div className="bg-background-deep text-on-surface relative flex min-h-dvh flex-col">
@@ -409,10 +578,41 @@ export function TastingPractice() {
               演習の設定
             </h1>
             <p className="text-body-sm text-on-surface-variant mb-6 font-[family-name:var(--font-body-sm)]">
-              過去問（JSON）と /generate で保存した生成問題から出題します。年度は複数選択・ミックス可です。
+              {mode === "wrong_notes"
+                ? "ログイン後に記録された未解決の誤答だけを出題します。"
+                : "過去問（JSON）と /generate で保存した生成問題から出題します。年度は複数選択・ミックス可です。"}
             </p>
 
             <div className="space-y-6">
+              {mode === "wrong_notes" ? (
+                <div className="glass-card border-glass-stroke rounded-xl border p-4">
+                  {!user ? (
+                    <>
+                      <p className="text-body-sm text-on-surface-variant mb-4 font-[family-name:var(--font-body-sm)]">
+                        誤答ノートの復習にはログインが必要です。
+                      </p>
+                      <Link
+                        href={`/login?next=${encodeURIComponent("/tasting?retry=wrong")}`}
+                        className="amber-cta inline-flex w-full justify-center"
+                      >
+                        ログイン
+                      </Link>
+                    </>
+                  ) : wrongNotesLoading ? (
+                    <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
+                      誤答ノートを読込中…
+                    </p>
+                  ) : (
+                    <p className="text-body-lg text-on-surface font-[family-name:var(--font-body-lg)]">
+                      未解決の誤答:{" "}
+                      <span className="text-amber-gold font-medium">
+                        {wrongNotesDeck.length} 問
+                      </span>
+                    </p>
+                  )}
+                </div>
+              ) : (
+              <>
               <fieldset className="space-y-3">
                 <legend className="text-label-caps text-on-surface-variant mb-2 block font-[family-name:var(--font-label-caps)]">
                   出題ソース
@@ -523,37 +723,116 @@ export function TastingPractice() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
-                    問題数（最大 50）
-                  </span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={50}
-                    value={count}
-                    onChange={(e) =>
-                      setCount(
-                        Math.min(50, Math.max(1, Number(e.target.value) || 1)),
-                      )
-                    }
-                    className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
-                  />
-                </label>
-                <label className="wq-checkbox-row sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    checked={shuffle}
-                    onChange={(e) => setShuffle(e.target.checked)}
-                  />
-                  <span className="text-body-lg text-on-surface font-[family-name:var(--font-body-lg)]">
-                    シャッフルして出題
-                  </span>
-                </label>
-              </div>
+              {showAdvancedFilters && (
+                <CollapsibleFilterCard
+                  icon="tune"
+                  title="詳細オプション"
+                  summary={`カテゴリ ${filterSummary(categories.length, CATEGORIES.length)} · タイプ ${filterSummary(types.length, QUESTION_TYPES.length)}`}
+                >
+                  <div className="space-y-5">
+                    <div>
+                      <div className="mb-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCategories(
+                              allCategoriesChecked ? [] : [...CATEGORIES],
+                            )
+                          }
+                          className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)]"
+                        >
+                          {allCategoriesChecked ? "全解除" : "全選択"}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {CATEGORIES.map((c) => {
+                          const checked = categories.includes(c);
+                          return (
+                            <label key={c} className={chipClass(checked)}>
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                onChange={() => setCategories(toggle(categories, c))}
+                              />
+                              {c}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="mb-3 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setTypes(allTypesChecked ? [] : [...QUESTION_TYPES])
+                          }
+                          className="text-label-caps text-amber-gold font-[family-name:var(--font-label-caps)]"
+                        >
+                          {allTypesChecked ? "全解除" : "全選択"}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {QUESTION_TYPES.map((t) => {
+                          const checked = types.includes(t);
+                          return (
+                            <label key={t} className={chipClass(checked)}>
+                              <input
+                                type="checkbox"
+                                className="sr-only"
+                                checked={checked}
+                                onChange={() => setTypes(toggle(types, t))}
+                              />
+                              {QUESTION_TYPE_LABELS[t]}
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    {!filtersValid && (
+                      <p className="text-body-sm text-error font-[family-name:var(--font-body-sm)]">
+                        カテゴリと問題タイプを 1 つ以上選んでください。
+                      </p>
+                    )}
+                  </div>
+                </CollapsibleFilterCard>
+              )}
 
-              {!hydrated && mode !== "saved_set" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
+                      問題数（最大 50）
+                    </span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={count}
+                      onChange={(e) =>
+                        setCount(
+                          Math.min(50, Math.max(1, Number(e.target.value) || 1)),
+                        )
+                      }
+                      className="dark-field text-body-lg w-full font-[family-name:var(--font-body-lg)]"
+                    />
+                  </label>
+                  <label className="wq-checkbox-row sm:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={shuffle}
+                      onChange={(e) => setShuffle(e.target.checked)}
+                    />
+                    <span className="text-body-lg text-on-surface font-[family-name:var(--font-body-lg)]">
+                      シャッフルして出題
+                    </span>
+                  </label>
+                </div>
+
+              </>
+              )}
+
+              {!hydrated && mode !== "saved_set" && mode !== "wrong_notes" && (
                 <p className="text-body-sm text-on-surface-variant font-[family-name:var(--font-body-sm)]">
                   生成問題リストを読込中…
                 </p>
@@ -570,21 +849,21 @@ export function TastingPractice() {
 
               <button
                 type="button"
-                disabled={
-                  mode === "saved_set"
-                    ? savedSetBuffer.length === 0
-                    : !hydrated
-                }
+                disabled={!canStart}
                 onClick={startSession}
                 className="amber-cta w-full"
               >
-                テイスティングを開始
+                {mode === "wrong_notes" ? "誤答復習を開始" : "テイスティングを開始"}
               </button>
             </div>
             <p className="text-body-sm text-on-surface-variant mt-3 text-center font-[family-name:var(--font-body-sm)]">
               {mode === "saved_set"
                 ? `保存セット: ${savedSetBuffer.length} 問`
-                : `保存済みの生成問題: ${generatedList.length} 問`}
+                : mode === "wrong_notes"
+                  ? user
+                    ? `未解決の誤答: ${wrongNotesDeck.length} 問`
+                    : "ログイン後に誤答を復習できます"
+                  : `保存済みの生成問題: ${generatedList.length} 問`}
             </p>
           </div>
         )}
@@ -758,6 +1037,15 @@ export function TastingPractice() {
                 >
                   同じ条件でもう一度
                 </button>
+                {wrongCountInSummary > 0 && (
+                  <button
+                    type="button"
+                    onClick={retryWrongInSession}
+                    className="amber-cta-outline w-full sm:w-auto"
+                  >
+                    不正解だけもう一度（{wrongCountInSummary} 問）
+                  </button>
+                )}
               </div>
             </div>
 

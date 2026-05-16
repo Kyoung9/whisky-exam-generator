@@ -34,7 +34,7 @@ const NAV_TABS: NavTab[] = [
   {
     key: "archive",
     icon: "auto_stories",
-    label: "過去問",
+    label: "ライブラリ",
     href: "/archive",
   },
   {
