@@ -7,6 +7,7 @@ import { loadExamSets } from "@/lib/exam-set-storage";
 import {
   formatPracticeAnswerDisplay,
   gradePracticeAnswer,
+  usesSelectableChoiceButtons,
 } from "@/lib/practice-grade";
 import {
   buildPracticeDeck,
@@ -97,7 +98,15 @@ export function TastingPractice() {
   >([]);
 
   const current = deck[index] ?? null;
-  const hasChoices = Boolean(current?.choices && current.choices.length > 0);
+  const choiceList =
+    current?.choices && current.choices.length > 0 ? current.choices : null;
+  const useChoiceButtons = Boolean(
+    choiceList && current && usesSelectableChoiceButtons(current.type),
+  );
+  const showStatementList = Boolean(
+    choiceList && current?.type === "true_false_count",
+  );
+  const needsFreeformInput = !useChoiceButtons;
   const progressPct =
     deck.length > 0 ? Math.round(((index + 1) / deck.length) * 100) : 0;
 
@@ -605,12 +614,27 @@ export function TastingPractice() {
               )}
             </section>
 
-            {hasChoices && current.choices && (
+            {showStatementList && choiceList && (
+              <section aria-label="判定項目">
+                <ol className="glass-card border-glass-stroke space-y-2 rounded-xl border p-5 pl-10">
+                  {choiceList.map((label, i) => (
+                    <li
+                      key={i}
+                      className="text-body-lg text-on-surface list-decimal font-[family-name:var(--font-body-lg)]"
+                    >
+                      {label}
+                    </li>
+                  ))}
+                </ol>
+              </section>
+            )}
+
+            {useChoiceButtons && choiceList && (
               <section
                 className="grid grid-cols-1 gap-4 md:grid-cols-2"
                 aria-label="選択肢"
               >
-                {current.choices.map((label, i) => {
+                {choiceList.map((label, i) => {
                   // 表示・送信値とも丸数字で統一（①〜⑳）。グレーディングが ①↔1 を吸収する
                   const choiceValue = choiceLabel(i);
                   const isSelected = answered && submittedAnswer === choiceValue;
@@ -653,11 +677,20 @@ export function TastingPractice() {
               </section>
             )}
 
-            {!hasChoices && (
-              <section className="space-y-3" aria-label="自由記述回答">
+            {needsFreeformInput && (
+              <section
+                className="space-y-3"
+                aria-label={
+                  current?.type === "true_false_count"
+                    ? "個数回答"
+                    : "自由記述回答"
+                }
+              >
                 <label className="block space-y-2">
                   <span className="text-label-caps text-on-surface-variant block font-[family-name:var(--font-label-caps)]">
-                    回答（番号は ① / 1 / 一 / イ いずれでも可。短文も可）
+                    {current?.type === "true_false_count"
+                      ? "正しい（該当する）ものの個数（① / 1 / 一 などでも可）"
+                      : "回答（番号は ① / 1 / 一 / イ いずれでも可。短文も可）"}
                   </span>
                   <textarea
                     value={textAnswer}
@@ -806,6 +839,7 @@ export function TastingPractice() {
                                 : formatPracticeAnswerDisplay(
                                     submitted,
                                     q.choices,
+                                    q.type,
                                   )}
                           </dd>
                         </div>
@@ -814,7 +848,11 @@ export function TastingPractice() {
                           <dd className="text-amber-gold min-w-0 break-words font-medium">
                             {q.answer == null || q.answer === ""
                               ? "（未登録）"
-                              : formatPracticeAnswerDisplay(q.answer, q.choices)}
+                              : formatPracticeAnswerDisplay(
+                                  q.answer,
+                                  q.choices,
+                                  q.type,
+                                )}
                           </dd>
                         </div>
                       </dl>

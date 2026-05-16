@@ -1,3 +1,5 @@
+import type { QuestionType } from "@/types/question";
+
 /** ①〜⑳ → "1"〜"20"（過去問の選択肢番号で多用） */
 const CIRCLED_NUMBER_MAP: Record<string, string> = {
   "①": "1",
@@ -73,16 +75,28 @@ function choiceIndexLabel(i: number): string {
   return CIRCLED_CHOICE_LABELS[i] ?? `(${i + 1})`;
 }
 
+/** 演習 UI で ①②… ボタン選択を使う問題形式 */
+export function usesSelectableChoiceButtons(type: QuestionType): boolean {
+  return type === "multiple_choice" || type === "image_based";
+}
+
 /**
  * 演習サマリー用: 解答が番号（① / 1 / 漢数字 等）で特定できるとき、
  * 「丸数字 + 選択肢本文」を返す。選択肢がない／解決できないときは trim 済み原文。
+ * true_false_count は個数回答のため choices へのインデックス解決を行わない。
  */
 export function formatPracticeAnswerDisplay(
   answerRaw: string,
   choices: string[] | undefined,
+  type?: QuestionType,
 ): string {
   const trimmed = answerRaw.trim();
   if (!choices?.length || trimmed === "") return trimmed;
+
+  if (type === "true_false_count") {
+    const normalized = normalizeAnswerText(trimmed).replace(/\s/g, "");
+    return normalized.length > 0 ? normalized : trimmed;
+  }
 
   const normalized = normalizeAnswerText(trimmed).replace(/\s/g, "");
 
