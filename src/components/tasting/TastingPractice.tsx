@@ -142,6 +142,29 @@ function choiceLabel(i: number): string {
   return CIRCLED_NUMBERS[i] ?? `(${i + 1})`;
 }
 
+function PracticeQuestionFigure({
+  imageRef,
+  imageDescription,
+  className = "",
+}: {
+  imageRef: string;
+  imageDescription?: string;
+  className?: string;
+}) {
+  return (
+    <figure
+      className={`glass-card overflow-hidden rounded-xl border ${className}`.trim()}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={imageRef}
+        alt={imageDescription ?? "問題画像"}
+        className="max-h-72 w-full object-contain"
+      />
+    </figure>
+  );
+}
+
 export function TastingPractice() {
   const searchParams = useSearchParams();
   const practiceSetId = searchParams.get("practiceSet");
@@ -882,14 +905,10 @@ export function TastingPractice() {
                 {current.body}
               </h1>
               {current.imageRef && (
-                <figure className="glass-card overflow-hidden rounded-xl border">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={current.imageRef}
-                    alt={current.imageDescription ?? "問題画像"}
-                    className="max-h-72 w-full object-contain"
-                  />
-                </figure>
+                <PracticeQuestionFigure
+                  imageRef={current.imageRef}
+                  imageDescription={current.imageDescription}
+                />
               )}
             </section>
 
@@ -1097,6 +1116,13 @@ export function TastingPractice() {
                       <p className="text-body-sm text-on-surface mb-4 whitespace-pre-wrap font-[family-name:var(--font-body-sm)] leading-relaxed">
                         {q.body}
                       </p>
+                      {q.imageRef && (
+                        <PracticeQuestionFigure
+                          imageRef={q.imageRef}
+                          imageDescription={q.imageDescription}
+                          className="mb-4"
+                        />
+                      )}
                       {q.choices && q.choices.length > 0 && (
                         <div className="border-glass-stroke bg-surface-container-low/30 mb-4 min-w-0 rounded-lg border px-3 py-2">
                           <p className="text-label-caps text-on-surface-variant mb-2 font-[family-name:var(--font-label-caps)]">
