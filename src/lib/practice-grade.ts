@@ -77,7 +77,11 @@ function choiceIndexLabel(i: number): string {
 
 /** 演習 UI で ①②… ボタン選択を使う問題形式 */
 export function usesSelectableChoiceButtons(type: QuestionType): boolean {
-  return type === "multiple_choice" || type === "image_based";
+  return (
+    type === "multiple_choice" ||
+    type === "image_based" ||
+    type === "table"
+  );
 }
 
 /**
